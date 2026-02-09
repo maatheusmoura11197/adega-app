@@ -11,14 +11,28 @@ import time
 # --- CONFIGURAÇÃO INICIAL ---
 st.set_page_config(page_title="Registro de Fidelidade", page_icon="🤑", layout="centered")
 
-# --- 🔒 BLOQUEIO VISUAL (MANTÉM SETINHA DO MENU VISÍVEL) ---
+# --- 🔒 BLOQUEIO VISUAL INTELIGENTE ---
+# AGORA O MENU LATERAL NÃO SOME MAIS!
 hide_streamlit_style = """
             <style>
-            #MainMenu {visibility: hidden;} 
-            footer {visibility: hidden;} 
+            #MainMenu {visibility: hidden;} /* Esconde os 3 pontinhos */
+            footer {visibility: hidden;}    /* Esconde o rodapé */
             
-            /* Esconde o cabeçalho colorido mas mantém o botão do menu clicável */
-            header {visibility: hidden;}
+            /* Esconde a barra colorida decorativa no topo */
+            [data-testid="stDecoration"] {
+                display: none;
+            }
+            
+            /* Esconde os botões do canto direito (GitHub, Settings, etc) */
+            [data-testid="stToolbar"] {
+                visibility: hidden;
+            }
+            
+            /* MAS... FORÇA A SETINHA DO MENU A FICAR VISÍVEL */
+            [data-testid="stSidebarCollapsedControl"] {
+                visibility: visible;
+                display: block;
+            }
             
             /* Animação do Brinde */
             @keyframes bounce {
@@ -163,7 +177,7 @@ else:
     df = pd.DataFrame()
 
 # ==========================================
-# ⚙️ MENU LATERAL (ADMIN) - ELE VOLTOU!
+# ⚙️ MENU LATERAL (ADMIN)
 # ==========================================
 with st.sidebar:
     st.header("⚙️ Menu Admin")
@@ -320,7 +334,6 @@ if st.session_state.confirmacao:
     st.write(f"Nome Atual: **{dados['nome_antigo']}**")
     st.info("Deseja atualizar e somar a compra?")
     
-    # AQUI ESTAVA O ERRO DE INDENTAÇÃO (AGORA CORRIGIDO)
     c1, c2 = st.columns(2)
     
     with c1:
