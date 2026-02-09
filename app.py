@@ -5,7 +5,7 @@ from oauth2client.service_account import ServiceAccountCredentials
 import urllib.parse 
 
 # --- CONFIGURAÇÃO INICIAL ---
-st.set_page_config(page_title="Fidelidade Adega", page_icon=")
+st.set_page_config(page_title="Controle de fidelidades", page_icon=")
 st.title("🍷 Controle de Fidelidades")
 
 # --- CONEXÃO COM O GOOGLE SHEETS ---
