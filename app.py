@@ -46,7 +46,7 @@ def registrar_historico(nome, telefone, acao):
 def gerar_mensagem_zap(nome_cliente, total_compras):
     if total_compras == 1:
         l1 = f"Olá, {nome_cliente}! Que alegria ter você aqui na nossa Adega! 🍷✨"
-        l2 = "Seja muito bem-vindo(a)! Já começamos com o pé direito o seu fidelidade."
+        l2 = "Seja muito bem-vindo(a)! Já começamos com o pé direito o seu cartão fidelidade."
         l3 = "*Status Atual:* 1 ponto (O início da jornada!)"
         l4 = "*Faltam apenas:* 9 compras para o seu super desconto!"
         l5 = "Muito obrigado pela preferência! 🚀"
@@ -56,7 +56,7 @@ def gerar_mensagem_zap(nome_cliente, total_compras):
     elif total_compras < 9:
         faltam = 10 - total_compras
         l1 = f"Fala, {nome_cliente}! Tudo ótimo? Que bom te ver de novo! 😍🍷"
-        l2 = "Ficamos muito felizes com a sua visita! Já registramos aqui:"
+        l2 = "Ficamos muito felizes com a sua compra! Já registramos aqui:"
         l3 = f"*Status Atual:* {total_compras} pontos"
         l4 = f"*Faltam apenas:* {faltam} compras para o prémio!"
         l5 = "O prémio está cada vez mais perto! Até a próxima! 🥂"
@@ -65,7 +65,7 @@ def gerar_mensagem_zap(nome_cliente, total_compras):
 
     elif total_compras == 9:
         l1 = f"UAU, {nome_cliente}!! Pare tudo! 😱🔥"
-        l2 = "Você está a um passo da glória! Olha só isso:"
+        l2 = "Você está a um passo da economia! Olha só isso:"
         l3 = "*Status Atual:* 9 pontos"
         l4 = "*Faltam apenas:* 1 compra (É A ÚLTIMA!)"
         l5 = "Na sua PRÓXIMA visita, o desconto de 50% é SEU! Vem logo! 🏃💨"
@@ -76,7 +76,7 @@ def gerar_mensagem_zap(nome_cliente, total_compras):
         l1 = f"PARABÉNS, {nome_cliente}!! HOJE É DIA DE FESTA! 🎉🍾"
         l2 = "Você é nosso cliente VIP e completou a cartela!"
         l3 = "*Status Atual:* 10 pontos (COMPLETO)"
-        l4 = "*Prémio:* 50% DE DESCONTO LIBERADO AGORA!"
+        l4 = "*Prémio:* 50% DE DESCONTO LIBERADO AGORA! escolha sua cerveja"
         l5 = "Vamos reiniciar seu cartão para ganhar de novo! 🥂✨"
         msg = f"{l1}\n\n{l2}\n{l3}\n\n{l4}\n\n{l5}"
         btn = "🏆 ENVIAR PRÉMIO AGORA"
@@ -141,7 +141,7 @@ telefone_completo = "+55" + numero_digitado
 telefone_limpo = limpar_telefone(telefone_completo)
 
 # --- BOTÃO DE AÇÃO ---
-if st.button("Verificar e Registar", type="primary"):
+if st.button("Verificar/Registar", type="primary"):
     # Verifica se digitou algo além do +55 (tem que ter pelo menos 10 digitos no total)
     if nome and len(telefone_limpo) > 10 and conexao:
         st.session_state.sucesso_msg = None 
