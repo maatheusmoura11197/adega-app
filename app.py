@@ -45,78 +45,49 @@ if st.button("Registar Compra", type="primary"):
 
                 st.success(f"✅ Feito! {nome} tem agora {novo_total} compras.")
 
-                # --- 2. TEXTOS COM EMOJIS ---
-                # Dica: Escrevemos os emojis direto. O truque está no link lá embaixo.
+                # --- 2. MENSAGENS (TEXTO PADRÃO) ---
+                # Podes editar o texto dentro das aspas abaixo como quiseres
                 
                 if novo_total == 1:
-                    msg_texto = f"""Olá, {nome}! Tudo bem? 👋😃
-
-Seja muito bem-vindo(a) à nossa Adega! 🍷✨
-Acabamos de ativar o seu Cartão Fidelidade.
-
-📌 *Como funciona?*
-A cada compra, você ganha 1 ponto. Juntou 10? Ganhou *50% DE DESCONTO*!
-
-Você já começou com o pé direito e tem *1 ponto*. Obrigado pela preferência! 🚀"""
-                    texto_botao = "📲 Enviar Boas-Vindas"
+                    msg_texto = f"Ola {nome}! Seja bem-vindo a nossa Adega! Ativamos o seu Cartao Fidelidade. A cada 10 compras voce ganha 50% de desconto. Voce ja tem 1 ponto. Obrigado!"
+                    texto_botao = "Enviar Boas-Vindas"
 
                 elif novo_total < 9:
                     faltam = 10 - novo_total
-                    msg_texto = f"""Olá, {nome}! Que bom te ver de novo! 😍🍷
-
-Registamos mais uma compra no seu fidelidade.
-📊 *Status Atual:* {novo_total} pontos
-🎯 *Faltam apenas:* {faltam} compras para o seu prémio!
-
-Estamos te esperando para a próxima! 🥂"""
-                    texto_botao = f"📲 Atualizar Saldo ({novo_total}/10)"
+                    msg_texto = f"Ola {nome}! Registramos mais uma compra no seu cartão fidelidade. Voce tem {novo_total} pontos. Faltam apenas {faltam} para o premio🥳!"
+                    texto_botao = f"Enviar Saldo ({novo_total}/10)"
 
                 elif novo_total == 9:
-                    msg_texto = f"""😱🔥 UAU!! Pare tudo, {nome}!
-
-Você acabou de completar *9 compras*!
-Isso significa que na sua PRÓXIMA visita, você ganha *50% DE DESCONTO*! 🎁💸
-
-Não deixe para depois, venha logo aproveitar seu prémio! 🏃‍♂️💨🍷"""
+                    msg_texto = f"Ola {nome}! Voce completou 9 compras! Na sua PROXIMA visita voce ganha 50% DE DESCONTO. Venha aproveitar!"
                     st.warning("⚠️ ALERTA: FALTA 1 PARA O PRÉMIO!")
-                    texto_botao = "🚨 AVISAR URGENTE (FALTA 1)"
+                    texto_botao = "AVISAR QUE FALTA 1"
 
                 else: 
-                    msg_texto = f"""🏆🎉 PARABÉNS, {nome}!! Hoje é dia de festa! 🍾
-
-Você é um cliente VIP e completou *10 compras*!
-🎁 O seu prémio de *50% DE DESCONTO* está liberado para usar HOJE!
-
-O seu cartão será reiniciado. Saúde! 🥂✨"""
+                    msg_texto = f"PARABENS {nome}! Voce completou 10 compras e ganhou 50% DE DESCONTO HOJE! O seu cartao sera reiniciado."
                     st.balloons()
-                    texto_botao = "🏆 ENVIAR PRÉMIO AGORA"
+                    texto_botao = "ENVIAR PREMIO AGORA"
                     
                     sheet.update_cell(linha_real, 3, 0) 
 
-                # 3. O LINK PERFEITO (A Mágica acontece aqui)
-                # Usamos quote() para transformar emojis em códigos (%F0%9F...)
-                # E usamos api.whatsapp.com que é mais robusto que o wa.me
+                # 3. LINK WHATSAPP (Via API Oficial)
                 msg_link = urllib.parse.quote(msg_texto)
                 link_zap = f"https://api.whatsapp.com/send?phone={telefone}&text={msg_link}"
                 
-                # 4. BOTÃO VERDE PERSONALIZADO (HTML)
-                # Criamos um botão manual com a cor exata do WhatsApp
+                # 4. BOTÃO VERDE (HTML SIMPLES)
                 st.markdown(f"""
                 <a href="{link_zap}" target="_blank" style="text-decoration: none;">
                     <div style="
                         background-color: #25D366;
                         color: white;
-                        padding: 15px 20px;
+                        padding: 15px;
                         border-radius: 10px;
                         text-align: center;
                         font-weight: bold;
                         font-size: 18px;
                         margin-top: 20px;
-                        box-shadow: 0px 4px 6px rgba(0,0,0,0.2);
-                        transition: 0.3s;
                         display: block;
                         width: 100%;">
-                        {texto_botao} 💬
+                        {texto_botao} 📲
                     </div>
                 </a>
                 """, unsafe_allow_html=True)
