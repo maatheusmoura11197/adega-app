@@ -22,7 +22,7 @@ with st.sidebar:
     else:
         st.warning("Cole o link da planilha no código para o botão funcionar.")
     st.markdown("---")
-    st.info("Use a área de 'Gerenciar Clientes' abaixo para editar ou excluir.")
+    
 
 # --- CONEXÃO COM O GOOGLE SHEETS ---
 try:
