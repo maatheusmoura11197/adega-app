@@ -57,6 +57,7 @@ def registrar_historico(nome, telefone, acao):
     sheet_historico.append_row([data, nome, telefone, acao])
 
 def gerar_mensagem_zap(nome_cliente, total_compras):
+    # Usamos f-strings normais. O segredo está no urllib.parse.quote lá embaixo.
     if total_compras == 1:
         l1 = f"Olá, {nome_cliente}! Que alegria ter você aqui na nossa Adega! 🍷✨"
         l2 = "Seja muito bem-vindo(a)! Já começamos com o pé direito o seu cartão fidelidade."
@@ -290,8 +291,9 @@ if not df.empty and conexao:
         idx = df[df['rotulo'] == cliente_selecionado].index[0]
         dados_cli = df.iloc[idx]
         
-        # Como o Google Sheets tem cabeçalho na linha 1, o índice 0 do Pandas é a linha 2
-        linha_sheet = idx + 2
+        # --- AQUI ESTAVA O PROBLEMA DO TYPEERROR ---
+        # Convertemos explicitamente para 'int' do Python
+        linha_sheet = int(idx) + 2 
         
         st.info(f"Editando: **{dados_cli['nome']}**")
         
@@ -318,7 +320,7 @@ if not df.empty and conexao:
                 st.rerun()
 
         if del_btn:
-            # Aqui fazemos uma gambiarra segura: pedimos confirmação fora do form
+            # Salva o ID na memória para confirmar fora do form
             st.session_state.id_exclusao = linha_sheet
             st.session_state.nome_exclusao = dados_cli['nome']
             st.rerun()
@@ -329,6 +331,7 @@ if not df.empty and conexao:
         col_conf1, col_conf2 = st.columns(2)
         if col_conf1.button("Sim, Excluir Definitivamente"):
             with st.spinner("Excluindo..."):
+                # O problema foi corrigido aqui: id_exclusao já é int agora
                 sheet_resumo.delete_rows(st.session_state.id_exclusao)
                 registrar_historico(st.session_state.nome_exclusao, "---", "CLIENTE EXCLUÍDO MANUALMENTE")
                 st.success("Cliente removido.")
