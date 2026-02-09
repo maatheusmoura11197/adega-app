@@ -6,7 +6,7 @@ import urllib.parse
 import re 
 from datetime import datetime
 import pytz 
-import time # Importante para o cronômetro
+import time 
 
 # --- CONFIGURAÇÃO INICIAL ---
 st.set_page_config(page_title="Registro de Fidelidade", page_icon="🤑", layout="centered")
@@ -18,64 +18,90 @@ hide_streamlit_style = """
             footer {visibility: hidden;}
             header {visibility: hidden;}
             .stAppHeader {display: none;}
+            
+            /* Animação do Brinde */
+            @keyframes bounce {
+                0% { transform: scale(1); }
+                50% { transform: scale(1.2); }
+                100% { transform: scale(1); }
+            }
+            .brinde {
+                font-size: 80px;
+                animation: bounce 1s infinite;
+                text-align: center;
+                display: block;
+            }
             </style>
             """
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 
 # ==========================================
-# 🔐 SISTEMA DE LOGIN COM TIMER (30 MIN)
+# 🔐 SISTEMA DE LOGIN (ESTÁVEL)
 # ==========================================
-SENHA_DO_SISTEMA = "adega123"  # Sua senha
-TEMPO_LIMITE_MINUTOS = 30      # Tempo para deslogar
+SENHA_DO_SISTEMA = "adega123"  # <--- SUA SENHA
+TEMPO_LIMITE_MINUTOS = 30
 
-# Inicializa variáveis de sessão
-if 'logado' not in st.session_state:
-    st.session_state.logado = False
-if 'ultima_atividade' not in st.session_state:
-    st.session_state.ultima_atividade = time.time()
+# Inicializa variáveis
+if 'logado' not in st.session_state: st.session_state.logado = False
+if 'validando' not in st.session_state: st.session_state.validando = False
+if 'ultima_atividade' not in st.session_state: st.session_state.ultima_atividade = time.time()
 
 def verificar_sessao():
-    """Verifica se já passou 30 minutos desde o último clique"""
+    """Verifica inatividade"""
     if st.session_state.logado:
         agora = time.time()
         tempo_passado = agora - st.session_state.ultima_atividade
-        # Se passou de 30 minutos (30 * 60 segundos)
         if tempo_passado > (TEMPO_LIMITE_MINUTOS * 60):
             st.session_state.logado = False
-            st.error("⏳ Sua sessão expirou por inatividade. Faça login novamente.")
+            st.error("⏳ Sessão expirada. Entre novamente.")
             return False
-        else:
-            # Se ainda está no tempo, RENOVA o tempo
-            st.session_state.ultima_atividade = agora
-            return True
+        st.session_state.ultima_atividade = agora
+        return True
     return False
 
-# --- TELA DE LOGIN ---
+# --- LÓGICA DO LOGIN ---
 if not st.session_state.logado:
-    st.title("🔒 Adega do Barão")
-    st.markdown("Acesso Restrito ao Sistema")
     
-    with st.form("login_form"):
-        senha_digitada = st.text_input("Digite a senha:", type="password")
-        entrar_btn = st.form_submit_button("ENTRAR", type="primary")
+    # 1. SE ESTIVER NA FASE DE ANIMAÇÃO (VALIDANDO)
+    if st.session_state.validando:
+        st.markdown("<br><br><br>", unsafe_allow_html=True)
+        st.markdown('<div class="brinde">🍻</div>', unsafe_allow_html=True)
+        st.markdown("<h3 style='text-align: center;'>Abrindo a Adega...</h3>", unsafe_allow_html=True)
         
-        if entrar_btn:
-            if senha_digitada == SENHA_DO_SISTEMA:
-                st.session_state.logado = True
-                st.session_state.ultima_atividade = time.time() # Marca a hora que entrou
-                st.rerun()
-            else:
-                st.error("❌ Senha incorreta!")
-    
-    st.stop() # Para o código aqui se não tiver logado
+        # O tempo de espera acontece aqui, com a animação JÁ na tela
+        time.sleep(2.5)
+        
+        # Agora libera o acesso
+        st.session_state.logado = True
+        st.session_state.validando = False
+        st.session_state.ultima_atividade = time.time()
+        st.rerun()
+        
+    # 2. SE ESTIVER NA TELA DE SENHA NORMAL
+    else:
+        st.title("🔒 Adega do Barão")
+        st.markdown("Acesso Restrito ao Sistema")
+        
+        with st.form("login_form"):
+            senha_digitada = st.text_input("Digite a senha:", type="password")
+            entrar_btn = st.form_submit_button("ENTRAR", type="primary")
+            
+            if entrar_btn:
+                if senha_digitada == SENHA_DO_SISTEMA:
+                    # Ativa o modo de validação e recarrega para mostrar a animação
+                    st.session_state.validando = True
+                    st.rerun()
+                else:
+                    st.error("❌ Senha incorreta!")
+        
+        st.stop() # Para aqui se não estiver logado
 
-# --- VERIFICAÇÃO DE TEMPO ---
-# Se estiver logado, mas o tempo estourou, ele bloqueia aqui
+# Verifica o tempo (se já estiver logado)
 if not verificar_sessao():
     st.stop()
 
 # ==========================================
-# 🍻 O SISTEMA COMEÇA AQUI (APÓS LOGIN E TIMER)
+# 🍻 O SISTEMA COMEÇA AQUI
 # ==========================================
 
 st.title("🍻 Adega do Barão")
@@ -90,13 +116,11 @@ with st.sidebar:
         st.link_button("📂 Abrir Planilha", URL_PLANILHA)
     
     st.markdown("---")
-    # Botão de Sair Manual
     if st.button("🔒 Sair Agora"):
         st.session_state.logado = False
         st.rerun()
     
-    # Mostra tempo restante (opcional, só para controle)
-    st.caption(f"Sessão expira em {TEMPO_LIMITE_MINUTOS} min de inatividade.")
+    st.caption(f"Sessão: {TEMPO_LIMITE_MINUTOS} min.")
 
 # --- CONEXÃO COM O GOOGLE SHEETS ---
 try:
