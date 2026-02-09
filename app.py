@@ -6,7 +6,7 @@ import urllib.parse
 import re 
 from datetime import datetime
 import pytz 
-import time # Importante para o cronômetro e para a animação de carregamento
+import time 
 
 # --- CONFIGURAÇÃO INICIAL ---
 st.set_page_config(page_title="Registro de Fidelidade", page_icon="🤑", layout="centered")
@@ -18,44 +18,67 @@ hide_streamlit_style = """
             footer {visibility: hidden;}
             header {visibility: hidden;}
             .stAppHeader {display: none;}
+            
+            /* Animação do Brinde */
+            @keyframes bounce {
+                0% { transform: scale(1); }
+                50% { transform: scale(1.2); }
+                100% { transform: scale(1); }
+            }
+            .brinde {
+                font-size: 80px;
+                animation: bounce 1s infinite;
+                text-align: center;
+                display: block;
+            }
             </style>
             """
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 
 # ==========================================
-# 🔐 SISTEMA DE LOGIN COM TIMER E ANIMAÇÃO 🍻
+# 🔐 SISTEMA DE LOGIN (ESTÁVEL)
 # ==========================================
-SENHA_DO_SISTEMA = "adega123"  # Sua senha
-TEMPO_LIMITE_MINUTOS = 30      # Tempo para deslogar
+SENHA_DO_SISTEMA = "adega123"  # <--- SUA SENHA
+TEMPO_LIMITE_MINUTOS = 30
 
-# Inicializa variáveis de sessão
-if 'logado' not in st.session_state:
-    st.session_state.logado = False
-if 'ultima_atividade' not in st.session_state:
-    st.session_state.ultima_atividade = time.time()
+# Inicializa variáveis
+if 'logado' not in st.session_state: st.session_state.logado = False
+if 'validando' not in st.session_state: st.session_state.validando = False
+if 'ultima_atividade' not in st.session_state: st.session_state.ultima_atividade = time.time()
 
 def verificar_sessao():
-    """Verifica se já passou 30 minutos desde o último clique"""
+    """Verifica inatividade"""
     if st.session_state.logado:
         agora = time.time()
         tempo_passado = agora - st.session_state.ultima_atividade
-        # Se passou de 30 minutos (30 * 60 segundos)
         if tempo_passado > (TEMPO_LIMITE_MINUTOS * 60):
             st.session_state.logado = False
-            st.error("⏳ Sua sessão expirou por inatividade. Faça login novamente.")
+            st.error("⏳ Sessão expirada. Entre novamente.")
             return False
-        else:
-            # Se ainda está no tempo, RENOVA o tempo
-            st.session_state.ultima_atividade = agora
-            return True
+        st.session_state.ultima_atividade = agora
+        return True
     return False
 
-# --- TELA DE LOGIN ---
+# --- LÓGICA DO LOGIN ---
 if not st.session_state.logado:
-    # Usamos um placeholder para poder substituir o formulário pela animação
-    login_area = st.empty()
     
-    with login_area.container():
+    # 1. SE ESTIVER NA FASE DE ANIMAÇÃO (VALIDANDO)
+    if st.session_state.validando:
+        st.markdown("<br><br><br>", unsafe_allow_html=True)
+        st.markdown('<div class="brinde">🍻</div>', unsafe_allow_html=True)
+        st.markdown("<h3 style='text-align: center;'>Abrindo a Adega...</h3>", unsafe_allow_html=True)
+        
+        # O tempo de espera acontece aqui, com a animação JÁ na tela
+        time.sleep(2.5)
+        
+        # Agora libera o acesso
+        st.session_state.logado = True
+        st.session_state.validando = False
+        st.session_state.ultima_atividade = time.time()
+        st.rerun()
+        
+    # 2. SE ESTIVER NA TELA DE SENHA NORMAL
+    else:
         st.title("🔒 Adega do Barão")
         st.markdown("Acesso Restrito ao Sistema")
         
@@ -65,42 +88,20 @@ if not st.session_state.logado:
             
             if entrar_btn:
                 if senha_digitada == SENHA_DO_SISTEMA:
-                    # --- MÁGICA DA ANIMAÇÃO 🍻 ---
-                    login_area.empty() # Limpa o formulário da tela
-                    
-                    # Mostra a animação de brinde
-                    st.markdown("""
-                        <div style='text-align: center; padding-top: 50px;'>
-                            <div style='font-size: 100px; animation: bounce 1s infinite alternate;'>🍻</div>
-                            <h2>Abrindo a Adega...</h2>
-                            <p>Validando credenciais...</p>
-                        </div>
-                        <style>
-                        @keyframes bounce {
-                            from { transform: translateY(0); }
-                            to   { transform: translateY(-20px); }
-                        }
-                        </style>
-                        """, unsafe_allow_html=True)
-                    
-                    # Espera 2.5 segundos para o usuário ver a animação
-                    time.sleep(2.5)
-                    
-                    # Prossegue com o login
-                    st.session_state.logado = True
-                    st.session_state.ultima_atividade = time.time()
+                    # Ativa o modo de validação e recarrega para mostrar a animação
+                    st.session_state.validando = True
                     st.rerun()
                 else:
                     st.error("❌ Senha incorreta!")
-    
-    st.stop() # Para o código aqui se não tiver logado
+        
+        st.stop() # Para aqui se não estiver logado
 
-# --- VERIFICAÇÃO DE TEMPO ---
+# Verifica o tempo (se já estiver logado)
 if not verificar_sessao():
     st.stop()
 
 # ==========================================
-# 🍻 O SISTEMA COMEÇA AQUI (APÓS LOGIN)
+# 🍻 O SISTEMA COMEÇA AQUI
 # ==========================================
 
 st.title("🍻 Adega do Barão")
@@ -119,7 +120,7 @@ with st.sidebar:
         st.session_state.logado = False
         st.rerun()
     
-    st.caption(f"Sessão expira em {TEMPO_LIMITE_MINUTOS} min de inatividade.")
+    st.caption(f"Sessão: {TEMPO_LIMITE_MINUTOS} min.")
 
 # --- CONEXÃO COM O GOOGLE SHEETS ---
 try:
@@ -335,3 +336,79 @@ if st.session_state.sucesso_msg:
     if st.button("🔄 Novo Atendimento"):
         st.session_state.sucesso_msg = None
         st.rerun()
+
+# ==========================================
+# 🛠️ GESTÃO DE CLIENTES
+# ==========================================
+st.markdown("---")
+st.subheader("🛠️ Gerenciar Clientes")
+
+if not df.empty and conexao:
+    df['rotulo'] = df['nome'] + " - " + df['telefone'].astype(str)
+    lista_clientes = df['rotulo'].tolist()
+    
+    col_busca, col_nada = st.columns([0.8, 0.2])
+    with col_busca:
+        cliente_selecionado = st.selectbox("Editar Cliente:", [""] + lista_clientes)
+
+    if cliente_selecionado:
+        idx = df[df['rotulo'] == cliente_selecionado].index[0]
+        dados_cli = df.iloc[idx]
+        linha_sheet = int(idx) + 2 
+        
+        st.info(f"Editando: **{dados_cli['nome']}**")
+        
+        with st.form("form_edicao"):
+            novo_nome_edit = st.text_input("Nome", value=dados_cli['nome'])
+            novo_tel_edit = st.text_input("Telefone", value=dados_cli['telefone'])
+            novos_pontos_edit = st.number_input("Pontos", min_value=0, value=int(dados_cli['compras']))
+            
+            c1, c2 = st.columns(2)
+            salvar = c1.form_submit_button("💾 Salvar")
+            excluir = c2.form_submit_button("🗑️ EXCLUIR", type="primary")
+
+        if salvar:
+            sheet_resumo.update_cell(linha_sheet, 1, novo_nome_edit.upper())
+            sheet_resumo.update_cell(linha_sheet, 2, novo_tel_edit)
+            sheet_resumo.update_cell(linha_sheet, 3, novos_pontos_edit)
+            registrar_historico(novo_nome_edit, novo_tel_edit, "Manual: Edição de dados")
+            st.success("Salvo!")
+            st.rerun()
+
+        if excluir:
+            st.session_state.id_exclusao = linha_sheet
+            st.session_state.nome_exclusao = dados_cli['nome']
+            st.rerun()
+
+    if 'id_exclusao' in st.session_state and st.session_state.id_exclusao:
+        st.error(f"⚠️ Excluir **{st.session_state.nome_exclusao}**?")
+        c1, c2 = st.columns(2)
+        if c1.button("Sim, Excluir"):
+            sheet_resumo.delete_rows(st.session_state.id_exclusao)
+            registrar_historico(st.session_state.nome_exclusao, "---", "CLIENTE EXCLUÍDO")
+            del st.session_state.id_exclusao
+            st.rerun()
+        if c2.button("Cancelar"):
+            del st.session_state.id_exclusao
+            st.rerun()
+
+# ==========================================
+# 🔎 CONSULTAR HISTÓRICO
+# ==========================================
+st.markdown("---")
+st.subheader("🔎 Histórico")
+busca_tel_input = st.text_input("Buscar Telefone", placeholder="Ex: 88999...")
+busca_tel = limpar_telefone("55" + busca_tel_input)
+
+if st.button("Buscar"):
+    if len(busca_tel) > 5:
+        try:
+            dados_hist = sheet_historico.get_all_records()
+            df_hist = pd.DataFrame(dados_hist)
+            df_hist['Telefone'] = df_hist['Telefone'].astype(str)
+            res = df_hist[df_hist['Telefone'].str.contains(busca_tel_input)]
+            if not res.empty:
+                st.dataframe(res[['Data', 'Ação']], use_container_width=True)
+            else:
+                st.warning("Nada encontrado.")
+        except: pass
