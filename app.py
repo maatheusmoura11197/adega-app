@@ -11,14 +11,14 @@ import pytz
 URL_PLANILHA = "https://docs.google.com/spreadsheets/d/191D0UIDvwDJPWRtp_0cBFS9rWaq6CkSj5ET_1HO2sLI/edit?usp=sharing" 
 
 # --- CONFIGURAÇÃO INICIAL ---
-st.set_page_config(page_title="Fidelidade Adega", page_icon="🍷", layout="centered")
-st.title("🍷 Fidelidade Adega Online")
+st.set_page_config(page_title="Registro de Fidelidade", page_icon="🤑", layout="centered")
+st.title("🍻 Adega do Barão")
 
 # --- BARRA LATERAL (MENU ADMIN) ---
 with st.sidebar:
-    st.header("⚙️ Menu Rápido")
+    st.header("⚙️ Menu ")
     if "docs.google.com" in URL_PLANILHA:
-        st.link_button("📂 Abrir Planilha Google", URL_PLANILHA)
+        st.link_button("📂 Abrir Planilha no Google", URL_PLANILHA)
     else:
         st.warning("Cole o link da planilha no código para o botão funcionar.")
     st.markdown("---")
@@ -146,7 +146,7 @@ with col_ddi:
     st.text_input("DDI", value="+55", disabled=True, label_visibility="collapsed")
 
 with col_num:
-    numero_digitado = st.text_input("Número", placeholder="88 99999-0000", label_visibility="collapsed")
+    numero_digitado = st.text_input("Número", placeholder="99 99999-0000", label_visibility="collapsed")
 
 telefone_completo = "+55" + numero_digitado
 telefone_limpo = limpar_telefone(telefone_completo)
