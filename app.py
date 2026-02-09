@@ -58,8 +58,8 @@ def gerar_mensagem_zap(nome_cliente, total_compras):
         l1 = f"Fala, {nome_cliente}! Tudo ótimo? Que bom te ver de novo!"
         l2 = "Ficamos muito felizes com a sua compra! Já registramos aqui:"
         l3 = f"*Status Atual:* {total_compras} pontos"
-        l4 = f"*Faltam apenas:* {faltam} compras para o prémio!"
-        l5 = "O prémio está cada vez mais perto! Até a próxima!"
+        l4 = f"*Faltam apenas:* {faltam} compras para o prêmio!"
+        l5 = "O prêmio está cada vez mais perto! Até a próxima!"
         msg = f"{l1}\n\n{l2}\n{l3}\n{l4}\n\n{l5}"
         btn = f"Enviar Saldo ({total_compras}/10) 📲"
 
