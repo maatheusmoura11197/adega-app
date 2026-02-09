@@ -17,30 +17,29 @@ try:
     creds = ServiceAccountCredentials.from_json_keyfile_dict(st.secrets["gcp_service_account"], scope)
     client = gspread.authorize(creds)
     
-    # AGORA ABRIMOS AS DUAS ABAS
-    sheet_resumo = client.open("Fidelidade").worksheet("Página1") # Aba Principal (Se chama Página1 ou Sheet1)
-    # Tenta abrir a aba Historico. Se não existir, avisa.
+    # ABAS
+    sheet_resumo = client.open("Fidelidade").worksheet("Página1") 
     try:
         sheet_historico = client.open("Fidelidade").worksheet("Historico")
     except:
-        st.error("⚠️ Crie uma aba chamada 'Historico' na sua planilha!")
+        st.error("⚠️ Crie uma aba chamada 'Historico' na planilha!")
         st.stop()
         
     conexao = True
 except Exception as e:
-    st.error(f"❌ Erro na conexão: {e}. Verifique se a aba principal se chama 'Página1' ou 'Sheet1'.")
+    st.error(f"❌ Erro na conexão: {e}. Verifique o nome da aba (Página1 ou Sheet1).")
     conexao = False
 
 # --- FUNÇÕES ÚTEIS ---
-def limpar_telefone(tel):
-    return re.sub(r'\D', '', tel)
+def limpar_telefone(tel_completo):
+    """Recebe o numero bagunçado e deixa apenas digitos"""
+    return re.sub(r'\D', '', tel_completo)
 
 def pegar_data_hora():
     fuso = pytz.timezone('America/Sao_Paulo')
     return datetime.now(fuso).strftime('%d/%m/%Y %H:%M')
 
 def registrar_historico(nome, telefone, acao):
-    """Grava uma linha nova na aba Historico"""
     data = pegar_data_hora()
     sheet_historico.append_row([data, nome, telefone, acao])
 
@@ -120,15 +119,31 @@ if not df.empty and conexao:
     st.divider()
 
 # ==========================================
-# 📝 REGISTRO DE COMPRAS
+# 📝 REGISTRO (COM TELEFONE TRAVADO)
 # ==========================================
 st.subheader("📝 Novo Registro")
 nome = st.text_input("Nome do Cliente").strip().upper()
-telefone_input = st.text_input("Telefone", value="+55 ", help="Apenas digite.")
-telefone_limpo = limpar_telefone(telefone_input)
 
+st.write("📞 Telefone do Cliente")
+# Criamos duas colunas: uma pequena para o +55 e uma grande para o número
+col_ddi, col_num = st.columns([0.2, 0.8])
+
+with col_ddi:
+    # disabled=True impede que a pessoa apague o +55
+    st.text_input("DDI", value="+55", disabled=True, label_visibility="collapsed")
+
+with col_num:
+    # Aqui a pessoa digita o resto
+    numero_digitado = st.text_input("Número", placeholder="88 99999-0000", label_visibility="collapsed")
+
+# Juntamos as duas partes automaticamente
+telefone_completo = "+55" + numero_digitado
+telefone_limpo = limpar_telefone(telefone_completo)
+
+# --- BOTÃO DE AÇÃO ---
 if st.button("Verificar e Registar", type="primary"):
-    if nome and telefone_limpo and conexao:
+    # Verifica se digitou algo além do +55 (tem que ter pelo menos 10 digitos no total)
+    if nome and len(telefone_limpo) > 10 and conexao:
         st.session_state.sucesso_msg = None 
         
         if not df.empty:
@@ -138,7 +153,7 @@ if st.button("Verificar e Registar", type="primary"):
             cliente_encontrado = pd.DataFrame()
 
         if not cliente_encontrado.empty:
-            # JÁ EXISTE -> Confirmação
+            # JÁ EXISTE
             dados_existentes = cliente_encontrado.iloc[0]
             idx = cliente_encontrado.index[0]
             
@@ -155,10 +170,7 @@ if st.button("Verificar e Registar", type="primary"):
         else:
             # NOVO CLIENTE
             data_hoje = pegar_data_hora()
-            
-            # 1. Grava no Resumo
             sheet_resumo.append_row([nome, telefone_limpo, 1, data_hoje])
-            # 2. Grava no Histórico
             registrar_historico(nome, telefone_limpo, "Cadastro + 1ª Compra")
             
             msg, btn_txt = gerar_mensagem_zap(nome, 1)
@@ -174,8 +186,10 @@ if st.button("Verificar e Registar", type="primary"):
 
     elif not conexao:
         st.error("Sem conexão.")
+    elif len(telefone_limpo) <= 4:
+        st.warning("Por favor, digite o número do telefone.")
     else:
-        st.warning("Preencha o nome e o telefone.")
+        st.warning("Preencha o nome corretamente.")
 
 # --- CONFIRMAÇÃO ---
 if st.session_state.confirmacao:
@@ -195,12 +209,10 @@ if st.session_state.confirmacao:
                 novo_total = int(dados['compras_atuais']) + 1
                 data_hoje = pegar_data_hora()
                 
-                # 1. Atualiza Resumo
                 sheet_resumo.update_cell(linha_real, 1, dados['nome_novo']) 
                 sheet_resumo.update_cell(linha_real, 3, novo_total)
                 sheet_resumo.update_cell(linha_real, 4, data_hoje) 
                 
-                # 2. Grava no Histórico
                 registrar_historico(dados['nome_novo'], dados['telefone'], f"Compra ({novo_total}º ponto)")
 
                 msg, btn_txt = gerar_mensagem_zap(dados['nome_novo'], novo_total)
@@ -215,11 +227,7 @@ if st.session_state.confirmacao:
                 }
                 
                 if novo_total >= 10:
-                     # Se ganhou prémio, regista no histórico também
                      registrar_historico(dados['nome_novo'], dados['telefone'], "🏆 PRÉMIO LIBERADO")
-                     # Se quiser zerar automatico, descomente:
-                     # sheet_resumo.update_cell(linha_real, 3, 0)
-                     # registrar_historico(dados['nome_novo'], dados['telefone'], "Ciclo Reiniciado")
 
                 st.session_state.confirmacao = False
                 st.rerun()
@@ -254,35 +262,28 @@ if st.session_state.sucesso_msg:
         st.rerun()
 
 # ==========================================
-# 🔎 CONSULTAR HISTÓRICO (NOVO!)
+# 🔎 CONSULTAR HISTÓRICO
 # ==========================================
 st.markdown("---")
-st.subheader("🔎 Consultar Histórico do Cliente")
+st.subheader("🔎 Consultar Histórico")
 
-# Caixa para pesquisar por telefone
-busca_tel_input = st.text_input("Digite o Telefone para pesquisar", value="", placeholder="Ex: 88999...")
-busca_tel = limpar_telefone(busca_tel_input)
+busca_tel_input = st.text_input("Pesquisar Telefone", placeholder="Ex: 88999...")
+busca_tel = limpar_telefone("55" + busca_tel_input) # Adiciona 55 na busca tb
 
 if st.button("Buscar Histórico"):
-    if busca_tel:
+    if len(busca_tel) > 5:
         try:
-            # Baixa os dados da aba Historico
             dados_hist = sheet_historico.get_all_records()
             df_hist = pd.DataFrame(dados_hist)
-            
-            # Garante que a coluna Telefone é texto para comparar
             df_hist['Telefone'] = df_hist['Telefone'].astype(str)
             
-            # Filtra pelo telefone digitado
-            resultado = df_hist[df_hist['Telefone'] == busca_tel]
+            # Tenta buscar com 55 ou sem 55 para garantir
+            resultado = df_hist[df_hist['Telefone'].str.contains(busca_tel_input)]
             
             if not resultado.empty:
                 st.info(f"Histórico encontrado para: **{resultado.iloc[0]['Nome']}**")
-                # Mostra a tabela bonitinha (sem o telefone pra não poluir)
                 st.dataframe(resultado[['Data', 'Ação']], use_container_width=True)
             else:
-                st.warning("Nenhum histórico encontrado para este número.")
-                
+                st.warning("Nenhum histórico encontrado.")
         except Exception as e:
-            st.error(f"Erro ao buscar histórico: {e}")
-            st.info("Dica: Verifique se a aba 'Historico' tem os cabeçalhos: Data, Nome, Telefone, Ação")
+            st.error(f"Erro: {e}")
