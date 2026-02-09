@@ -1,52 +1,42 @@
 import streamlit as st
 import pandas as pd
 
-# --- CONFIGURAÇÃO DO TEU CADERNO ---
-# 1. Abre a tua folha no Google Sheets
-# 2. Clica em Partilhar -> Qualquer pessoa com o link -> Editor
-# 3. Cola o link aqui entre as aspas:
-LINK_GOOGLE = "https://docs.google.com/spreadsheets/d/191D0UIDvwDJPWRtp_0cBFS9rWaq6CkSj5ET_1HO2sLI/edit?usp=sharing"
-
-# Esta linha transforma o link normal num link que o Python consegue ler
-if "edit?usp=sharing" in LINK_GOOGLE:
-    URL_CSV = LINK_GOOGLE.replace("edit?usp=sharing", "export?format=csv")
-else:
-    URL_CSV = LINK_GOOGLE + "/export?format=csv"
+# O LINK DA TUA FOLHA (Já coloquei o teu link correto aqui)
+LINK_GOOGLE = "https://docs.google.com/spreadsheets/d/191D0UIDvwDJPWRtp_0cBFS9rWaq6CkSj5ET_1HO2sLI/export?format=csv"
 
 st.set_page_config(page_title="Fidelidade Adega", page_icon="🍷")
 st.title("🍷 Fidelidade Adega Online")
 
-# Campos de entrada
+# Interface do Utilizador
 nome = st.text_input("Nome do Cliente").strip().upper()
 telefone = st.text_input("Telefone (com o 55 da frente)").strip()
 
 if st.button("Registar Compra"):
     if nome and telefone:
         try:
-            # Lê os dados da internet
-            df = pd.read_csv(URL_CSV)
+            # Tenta ler a folha
+            df = pd.read_csv(LINK_GOOGLE)
             
-            # Se o cliente existe, soma 1. Se não, começa com 1.
+            # Procura o cliente
             if nome in df['nome'].values:
-                df.loc[df['nome'] == nome, 'compras'] += 1
-                total = df.loc[df['nome'] == nome, 'compras'].values[0]
+                # Se encontrar, mostra o valor que está lá + 1
+                compras_na_folha = df.loc[df['nome'] == nome, 'compras'].values[0]
+                total = compras_na_folha + 1
             else:
                 total = 1
-                st.info("Novo cliente registado!")
+            
+            st.success(f"Sucesso! {nome} tem agora {total} compras.")
+            
+            # --- ATENÇÃO ---
+            # Para o Python GRAVAR na folha, precisamos de configurar as 'Secrets' no Streamlit.
+            # Enquanto não fazemos isso, o valor só aparece na tela.
+            st.warning("⚠️ O sistema está em modo de teste. Os dados ainda não estão a ser gravados na folha do Google.")
 
-            st.success(f"Sucesso! {nome} tem {total} compras.")
-
-            # Regra dos 50%
             if total >= 9:
                 st.balloons()
-                st.warning("🚨 GANHOU 50% DE DESCONTO!")
-                msg = f"Ola {nome}! Voce completou {total} compras e ganhou 50% de desconto na proxima!"
+                msg = f"Ola {nome}! Voce ganhou 50% de desconto na sua 10ª compra!"
                 link_zap = f"https://wa.me/{telefone}?text={msg.replace(' ', '%20')}"
                 st.markdown(f"### [CLIQUE AQUI PARA MANDAR WHATSAPP]({link_zap})")
-            
-            st.write("⚠️ Nota: Para salvar permanentemente, lembra-te de atualizar a folha do Google (ou usaremos um banco de dados real no próximo passo).")
-            
+
         except Exception as e:
-            st.error(f"Erro ao ler o Google Sheets. Verificaste o link? {e}")
-    else:
-        st.error("Preenche o nome e o telefone!")
+            st.error(f"Erro ao ler a folha: {e}")
