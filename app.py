@@ -11,27 +11,27 @@ import time
 # --- CONFIGURAÇÃO INICIAL ---
 st.set_page_config(page_title="Registro de Fidelidade", page_icon="🤑", layout="centered")
 
-# --- 🔒 BLOQUEIO VISUAL INTELIGENTE ---
-# AGORA O MENU LATERAL NÃO SOME MAIS!
+# --- 🔒 BLOQUEIO VISUAL (CORRIGIDO PARA O MENU APARECER) ---
 hide_streamlit_style = """
             <style>
-            #MainMenu {visibility: hidden;} /* Esconde os 3 pontinhos */
-            footer {visibility: hidden;}    /* Esconde o rodapé */
+            /* 1. Esconde o Menu de 3 pontinhos e o Rodapé */
+            #MainMenu {visibility: hidden;}
+            footer {visibility: hidden;}
             
-            /* Esconde a barra colorida decorativa no topo */
+            /* 2. Esconde a barra colorida no topo (decoração) */
             [data-testid="stDecoration"] {
                 display: none;
             }
             
-            /* Esconde os botões do canto direito (GitHub, Settings, etc) */
+            /* 3. Esconde os botões da direita (Deploy, GitHub, Settings) */
             [data-testid="stToolbar"] {
                 visibility: hidden;
             }
             
-            /* MAS... FORÇA A SETINHA DO MENU A FICAR VISÍVEL */
-            [data-testid="stSidebarCollapsedControl"] {
-                visibility: visible;
-                display: block;
+            /* 4. GARANTE QUE O CABEÇALHO (ONDE FICA O MENU) ESTEJA VISÍVEL */
+            header {
+                visibility: visible !important;
+                background: transparent !important;
             }
             
             /* Animação do Brinde */
