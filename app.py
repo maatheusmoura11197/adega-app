@@ -6,13 +6,12 @@ import urllib.parse
 import re 
 from datetime import datetime
 import pytz 
-import time
+import time # Importante para o cronômetro
 
 # --- CONFIGURAÇÃO INICIAL ---
 st.set_page_config(page_title="Registro de Fidelidade", page_icon="🤑", layout="centered")
 
-# --- 🔒 BLOQUEIO VISUAL (ESCONDE MENUS E RODAPÉ) ---
-# Isso deixa o site com cara de aplicativo profissional
+# --- 🔒 BLOQUEIO VISUAL ---
 hide_streamlit_style = """
             <style>
             #MainMenu {visibility: hidden;}
@@ -24,27 +23,59 @@ hide_streamlit_style = """
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 
 # ==========================================
-# 🔐 TELA DE LOGIN (O PORTEIRO)
+# 🔐 SISTEMA DE LOGIN COM TIMER (30 MIN)
 # ==========================================
-SENHA_DO_SISTEMA = "adega123"  # <--- SUA SENHA AQUI
+SENHA_DO_SISTEMA = "adega123"  # Sua senha
+TEMPO_LIMITE_MINUTOS = 30      # Tempo para deslogar
 
+# Inicializa variáveis de sessão
 if 'logado' not in st.session_state:
     st.session_state.logado = False
+if 'ultima_atividade' not in st.session_state:
+    st.session_state.ultima_atividade = time.time()
 
-def verificar_senha():
-    if st.session_state.senha_digitada == SENHA_DO_SISTEMA:
-        st.session_state.logado = True
-    else:
-        st.session_state.logado = False
-        st.error("❌ Senha incorreta")
+def verificar_sessao():
+    """Verifica se já passou 30 minutos desde o último clique"""
+    if st.session_state.logado:
+        agora = time.time()
+        tempo_passado = agora - st.session_state.ultima_atividade
+        # Se passou de 30 minutos (30 * 60 segundos)
+        if tempo_passado > (TEMPO_LIMITE_MINUTOS * 60):
+            st.session_state.logado = False
+            st.error("⏳ Sua sessão expirou por inatividade. Faça login novamente.")
+            return False
+        else:
+            # Se ainda está no tempo, RENOVA o tempo
+            st.session_state.ultima_atividade = agora
+            return True
+    return False
 
+# --- TELA DE LOGIN ---
 if not st.session_state.logado:
-    st.title("🔒 Adega do Barão - Acesso Restrito")
-    st.text_input("Digite a senha de acesso:", type="password", key="senha_digitada", on_change=verificar_senha)
-    st.stop()  # <--- O CÓDIGO PARA AQUI SE NÃO TIVER LOGADO
+    st.title("🔒 Adega do Barão")
+    st.markdown("Acesso Restrito ao Sistema")
+    
+    with st.form("login_form"):
+        senha_digitada = st.text_input("Digite a senha:", type="password")
+        entrar_btn = st.form_submit_button("ENTRAR", type="primary")
+        
+        if entrar_btn:
+            if senha_digitada == SENHA_DO_SISTEMA:
+                st.session_state.logado = True
+                st.session_state.ultima_atividade = time.time() # Marca a hora que entrou
+                st.rerun()
+            else:
+                st.error("❌ Senha incorreta!")
+    
+    st.stop() # Para o código aqui se não tiver logado
+
+# --- VERIFICAÇÃO DE TEMPO ---
+# Se estiver logado, mas o tempo estourou, ele bloqueia aqui
+if not verificar_sessao():
+    st.stop()
 
 # ==========================================
-# 🍻 O SISTEMA COMEÇA AQUI (SÓ CARREGA SE TIVER LOGADO)
+# 🍻 O SISTEMA COMEÇA AQUI (APÓS LOGIN E TIMER)
 # ==========================================
 
 st.title("🍻 Adega do Barão")
@@ -52,18 +83,20 @@ st.title("🍻 Adega do Barão")
 # --- 🔗 LINK DA SUA PLANILHA ---
 URL_PLANILHA = "https://docs.google.com/spreadsheets/d/191D0UIDvwDJPWRtp_0cBFS9rWaq6CkSj5ET_1HO2sLI/edit?usp=sharing" 
 
-# --- BARRA LATERAL (MENU ADMIN) ---
+# --- BARRA LATERAL ---
 with st.sidebar:
-    st.header("⚙️ Menu ")
+    st.header("⚙️ Menu Admin")
     if "docs.google.com" in URL_PLANILHA:
-        st.link_button("📂 Abrir Planilha no Google", URL_PLANILHA)
-    else:
-        st.warning("Cole o link da planilha no código para o botão funcionar.")
+        st.link_button("📂 Abrir Planilha", URL_PLANILHA)
+    
     st.markdown("---")
-    # Botão para sair (Logout)
-    if st.button("🔒 Sair do Sistema"):
+    # Botão de Sair Manual
+    if st.button("🔒 Sair Agora"):
         st.session_state.logado = False
         st.rerun()
+    
+    # Mostra tempo restante (opcional, só para controle)
+    st.caption(f"Sessão expira em {TEMPO_LIMITE_MINUTOS} min de inatividade.")
 
 # --- CONEXÃO COM O GOOGLE SHEETS ---
 try:
@@ -78,15 +111,13 @@ try:
     except:
         st.error("⚠️ Crie uma aba chamada 'Historico' na planilha!")
         st.stop()
-        
     conexao = True
 except Exception as e:
-    st.error(f"❌ Erro na conexão: {e}. Verifique o nome da aba (Página1 ou Sheet1).")
+    st.error(f"❌ Erro na conexão: {e}")
     conexao = False
 
 # --- FUNÇÕES ÚTEIS ---
 def limpar_telefone(tel_completo):
-    """Recebe o numero bagunçado e deixa apenas digitos"""
     return re.sub(r'\D', '', tel_completo)
 
 def pegar_data_hora():
@@ -98,53 +129,24 @@ def registrar_historico(nome, telefone, acao):
     sheet_historico.append_row([data, nome, telefone, acao])
 
 def gerar_mensagem_zap(nome_cliente, total_compras):
-    # Usamos f-strings normais. O segredo está no urllib.parse.quote lá embaixo.
     if total_compras == 1:
-        l1 = f"Olá, {nome_cliente}! Que alegria ter você aqui na nossa Adega! 🍷✨"
-        l2 = "Seja muito bem-vindo(a)! Já começamos com o pé direito o seu cartão fidelidade."
-        l3 = "*Status Atual:* 1 ponto (O início da jornada!)"
-        l4 = "*Faltam apenas:* 9 compras para o seu super desconto!"
-        l5 = "Muito obrigado pela preferência! 🚀"
-        msg = f"{l1}\n\n{l2}\n{l3}\n{l4}\n\n{l5}"
+        msg = f"Olá {nome_cliente}! Bem-vindo à Adega! 🍷\nStatus: 1 ponto."
         btn = "Enviar Boas-Vindas 🎉"
-
     elif total_compras < 9:
-        faltam = 10 - total_compras
-        l1 = f"Fala, {nome_cliente}! Tudo ótimo? Que bom te ver de novo!"
-        l2 = "Ficamos muito felizes com a sua compra! Já registramos aqui:"
-        l3 = f"*Status Atual:* {total_compras} pontos"
-        l4 = f"*Faltam apenas:* {faltam} compras para o prêmio!"
-        l5 = "O prêmio está cada vez mais perto! Até a próxima!"
-        msg = f"{l1}\n\n{l2}\n{l3}\n{l4}\n\n{l5}"
+        msg = f"Olá {nome_cliente}! Mais uma compra!\nStatus: {total_compras}/10 pontos."
         btn = f"Enviar Saldo ({total_compras}/10) 📲"
-
     elif total_compras == 9:
-        l1 = f"UAU, {nome_cliente}!! Pare tudo! 😱🔥"
-        l2 = "Você está a um passo da economia! Olha só isso:"
-        l3 = "*Status Atual:* 9 pontos"
-        l4 = "*Faltam apenas:* 1 compra (É A ÚLTIMA!)"
-        l5 = "Na sua PRÓXIMA visita, o desconto de 50% é SEU! Vem logo! 🏃💨"
-        msg = f"{l1}\n\n{l2}\n{l3}\n{l4}\n\n{l5}"
+        msg = f"UAU {nome_cliente}! Falta 1 para o prémio! 😱"
         btn = "🚨 AVISAR URGENTE (FALTA 1)"
-
     else: 
-        l1 = f"PARABÉNS, {nome_cliente}!! HOJE É DIA DE FESTA! 🎉🍾"
-        l2 = "Você é nosso cliente VIP e completou a cartela!"
-        l3 = "*Status Atual:* 10 pontos (COMPLETO)"
-        l4 = "*Prémio:* 50% DE DESCONTO LIBERADO AGORA! escolha sua cerveja"
-        l5 = "Vamos reiniciar seu cartão para ganhar de novo! 🥂✨"
-        msg = f"{l1}\n\n{l2}\n{l3}\n\n{l4}\n\n{l5}"
+        msg = f"PARABÉNS {nome_cliente}! Ganhou 50% OFF! 🏆"
         btn = "🏆 ENVIAR PRÉMIO AGORA"
-
     return msg, btn
 
 # --- ESTADO DA SESSÃO ---
-if 'confirmacao' not in st.session_state:
-    st.session_state.confirmacao = False
-if 'dados_temp' not in st.session_state:
-    st.session_state.dados_temp = {}
-if 'sucesso_msg' not in st.session_state:
-    st.session_state.sucesso_msg = None
+if 'confirmacao' not in st.session_state: st.session_state.confirmacao = False
+if 'dados_temp' not in st.session_state: st.session_state.dados_temp = {}
+if 'sucesso_msg' not in st.session_state: st.session_state.sucesso_msg = None
 
 # --- CARREGAR DADOS ---
 if conexao:
@@ -174,13 +176,12 @@ if not df.empty and conexao:
     st.divider()
 
 # ==========================================
-# 📝 REGISTRO (COM TELEFONE TRAVADO)
+# 📝 REGISTRO
 # ==========================================
 st.subheader("📝 Novo Registro")
 nome = st.text_input("Nome do Cliente").strip().upper()
 
 st.write("📞 Telefone do Cliente")
-# Criamos duas colunas: uma pequena para o +55 e uma grande para o número
 col_ddi, col_num = st.columns([0.2, 0.8])
 
 with col_ddi:
@@ -313,27 +314,22 @@ if st.session_state.sucesso_msg:
         st.rerun()
 
 # ==========================================
-# 🛠️ ÁREA DE GESTÃO (EDITAR/EXCLUIR)
+# 🛠️ GESTÃO DE CLIENTES
 # ==========================================
 st.markdown("---")
-st.subheader("🛠️ Gerenciar Clientes (Editar ou Excluir)")
+st.subheader("🛠️ Gerenciar Clientes")
 
 if not df.empty and conexao:
-    # Cria uma lista formatada para selecionar (Nome - Telefone)
     df['rotulo'] = df['nome'] + " - " + df['telefone'].astype(str)
     lista_clientes = df['rotulo'].tolist()
     
     col_busca, col_nada = st.columns([0.8, 0.2])
     with col_busca:
-        cliente_selecionado = st.selectbox("Selecione o Cliente para Editar:", [""] + lista_clientes)
+        cliente_selecionado = st.selectbox("Editar Cliente:", [""] + lista_clientes)
 
     if cliente_selecionado:
-        # Pega o índice do cliente selecionado no DataFrame
         idx = df[df['rotulo'] == cliente_selecionado].index[0]
         dados_cli = df.iloc[idx]
-        
-        # --- AQUI ESTAVA O PROBLEMA DO TYPEERROR ---
-        # Convertemos explicitamente para 'int' do Python
         linha_sheet = int(idx) + 2 
         
         st.info(f"Editando: **{dados_cli['nome']}**")
@@ -341,73 +337,54 @@ if not df.empty and conexao:
         with st.form("form_edicao"):
             novo_nome_edit = st.text_input("Nome", value=dados_cli['nome'])
             novo_tel_edit = st.text_input("Telefone", value=dados_cli['telefone'])
-            novos_pontos_edit = st.number_input("Pontos/Compras", min_value=0, value=int(dados_cli['compras']))
+            novos_pontos_edit = st.number_input("Pontos", min_value=0, value=int(dados_cli['compras']))
             
-            col_save, col_del = st.columns(2)
-            
-            with col_save:
-                save_btn = st.form_submit_button("💾 Salvar Alterações")
-            with col_del:
-                del_btn = st.form_submit_button("🗑️ EXCLUIR CLIENTE", type="primary")
+            c1, c2 = st.columns(2)
+            salvar = c1.form_submit_button("💾 Salvar")
+            excluir = c2.form_submit_button("🗑️ EXCLUIR", type="primary")
 
-        if save_btn:
-            with st.spinner("Salvando..."):
-                sheet_resumo.update_cell(linha_sheet, 1, novo_nome_edit.upper()) # Col 1: Nome
-                sheet_resumo.update_cell(linha_sheet, 2, novo_tel_edit)          # Col 2: Tel
-                sheet_resumo.update_cell(linha_sheet, 3, novos_pontos_edit)      # Col 3: Pontos
-                
-                registrar_historico(novo_nome_edit, novo_tel_edit, f"Manual: Dados alterados para {novos_pontos_edit} pts")
-                st.success("Dados atualizados com sucesso!")
-                st.rerun()
+        if salvar:
+            sheet_resumo.update_cell(linha_sheet, 1, novo_nome_edit.upper())
+            sheet_resumo.update_cell(linha_sheet, 2, novo_tel_edit)
+            sheet_resumo.update_cell(linha_sheet, 3, novos_pontos_edit)
+            registrar_historico(novo_nome_edit, novo_tel_edit, "Manual: Edição de dados")
+            st.success("Salvo!")
+            st.rerun()
 
-        if del_btn:
-            # Salva o ID na memória para confirmar fora do form
+        if excluir:
             st.session_state.id_exclusao = linha_sheet
             st.session_state.nome_exclusao = dados_cli['nome']
             st.rerun()
 
-    # Confirmação de Exclusão (Fora do form para funcionar o rerun)
     if 'id_exclusao' in st.session_state and st.session_state.id_exclusao:
-        st.error(f"⚠️ Tem certeza que deseja excluir **{st.session_state.nome_exclusao}**? Essa ação não tem volta.")
-        col_conf1, col_conf2 = st.columns(2)
-        if col_conf1.button("Sim, Excluir Definitivamente"):
-            with st.spinner("Excluindo..."):
-                # O problema foi corrigido aqui: id_exclusao já é int agora
-                sheet_resumo.delete_rows(st.session_state.id_exclusao)
-                registrar_historico(st.session_state.nome_exclusao, "---", "CLIENTE EXCLUÍDO MANUALMENTE")
-                st.success("Cliente removido.")
-                # Limpa estados
-                del st.session_state.id_exclusao
-                del st.session_state.nome_exclusao
-                st.rerun()
-        
-        if col_conf2.button("Cancelar"):
+        st.error(f"⚠️ Excluir **{st.session_state.nome_exclusao}**?")
+        c1, c2 = st.columns(2)
+        if c1.button("Sim, Excluir"):
+            sheet_resumo.delete_rows(st.session_state.id_exclusao)
+            registrar_historico(st.session_state.nome_exclusao, "---", "CLIENTE EXCLUÍDO")
             del st.session_state.id_exclusao
-            del st.session_state.nome_exclusao
+            st.rerun()
+        if c2.button("Cancelar"):
+            del st.session_state.id_exclusao
             st.rerun()
 
 # ==========================================
 # 🔎 CONSULTAR HISTÓRICO
 # ==========================================
 st.markdown("---")
-st.subheader("🔎 Consultar Histórico")
-
-busca_tel_input = st.text_input("Pesquisar Telefone no Histórico", placeholder="Ex: 88999...")
+st.subheader("🔎 Histórico")
+busca_tel_input = st.text_input("Buscar Telefone", placeholder="Ex: 88999...")
 busca_tel = limpar_telefone("55" + busca_tel_input)
 
-if st.button("Buscar Histórico"):
+if st.button("Buscar"):
     if len(busca_tel) > 5:
         try:
             dados_hist = sheet_historico.get_all_records()
             df_hist = pd.DataFrame(dados_hist)
             df_hist['Telefone'] = df_hist['Telefone'].astype(str)
-            
-            resultado = df_hist[df_hist['Telefone'].str.contains(busca_tel_input)]
-            
-            if not resultado.empty:
-                st.info(f"Histórico encontrado para: **{resultado.iloc[0]['Nome']}**")
-                st.dataframe(resultado[['Data', 'Ação']], use_container_width=True)
+            res = df_hist[df_hist['Telefone'].str.contains(busca_tel_input)]
+            if not res.empty:
+                st.dataframe(res[['Data', 'Ação']], use_container_width=True)
             else:
-                st.warning("Nenhum histórico encontrado.")
-        except Exception as e:
-            st.error(f"Erro: {e}")
+                st.warning("Nada encontrado.")
+        except: pass
