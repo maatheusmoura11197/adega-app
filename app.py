@@ -26,7 +26,7 @@ telefone = st.text_input("Telefone (com DDD, apenas números)").strip()
 if st.button("Registar Compra", type="primary"):
     if nome and telefone and conexao:
         try:
-            with st.spinner('Gravando...'):
+            with st.spinner('A processar...'):
                 # 1. LER DADOS
                 todos_dados = sheet.get_all_records()
                 df = pd.DataFrame(todos_dados)
@@ -34,19 +34,19 @@ if st.button("Registar Compra", type="primary"):
                 novo_total = 1
                 if df.empty or nome not in df['nome'].values:
                     sheet.append_row([nome, telefone, 1])
-                    st.toast(f"Novo cliente!")
+                    st.toast(f"Novo cliente cadastrado!")
                 else:
                     indice = df[df['nome'] == nome].index[0]
                     linha_real = indice + 2 
                     compras_atuais = df.loc[indice, 'compras']
                     novo_total = int(compras_atuais) + 1
                     sheet.update_cell(linha_real, 3, novo_total)
-                    st.toast(f"Compra somada!")
+                    st.toast(f"Compra registada!")
 
                 st.success(f"✅ Feito! {nome} tem agora {novo_total} compras.")
 
-                # --- 2. MENSAGENS COM EMOJIS REAIS ---
-                # Aqui escrevemos como se fosse no WhatsApp mesmo
+                # --- 2. TEXTOS COM EMOJIS ---
+                # Dica: Escrevemos os emojis direto. O truque está no link lá embaixo.
                 
                 if novo_total == 1:
                     msg_texto = f"""Olá, {nome}! Tudo bem? 👋😃
@@ -58,7 +58,7 @@ Acabamos de ativar o seu Cartão Fidelidade.
 A cada compra, você ganha 1 ponto. Juntou 10? Ganhou *50% DE DESCONTO*!
 
 Você já começou com o pé direito e tem *1 ponto*. Obrigado pela preferência! 🚀"""
-                    label_botao = "📲 Enviar Boas-Vindas"
+                    texto_botao = "📲 Enviar Boas-Vindas"
 
                 elif novo_total < 9:
                     faltam = 10 - novo_total
@@ -69,7 +69,7 @@ Registamos mais uma compra no seu fidelidade.
 🎯 *Faltam apenas:* {faltam} compras para o seu prémio!
 
 Estamos te esperando para a próxima! 🥂"""
-                    label_botao = f"📲 Atualizar Saldo ({novo_total}/10)"
+                    texto_botao = f"📲 Atualizar Saldo ({novo_total}/10)"
 
                 elif novo_total == 9:
                     msg_texto = f"""😱🔥 UAU!! Pare tudo, {nome}!
@@ -79,7 +79,7 @@ Isso significa que na sua PRÓXIMA visita, você ganha *50% DE DESCONTO*! 🎁�
 
 Não deixe para depois, venha logo aproveitar seu prémio! 🏃‍♂️💨🍷"""
                     st.warning("⚠️ ALERTA: FALTA 1 PARA O PRÉMIO!")
-                    label_botao = "🚨 AVISAR URGENTE (FALTA 1)"
+                    texto_botao = "🚨 AVISAR URGENTE (FALTA 1)"
 
                 else: 
                     msg_texto = f"""🏆🎉 PARABÉNS, {nome}!! Hoje é dia de festa! 🍾
@@ -89,17 +89,37 @@ Você é um cliente VIP e completou *10 compras*!
 
 O seu cartão será reiniciado. Saúde! 🥂✨"""
                     st.balloons()
-                    label_botao = "🏆 ENVIAR PRÉMIO AGORA"
+                    texto_botao = "🏆 ENVIAR PRÉMIO AGORA"
                     
                     sheet.update_cell(linha_real, 3, 0) 
 
-                # 3. LINK NATIVO (Sem HTML complicado)
-                # Esta função prepara o texto para link
-                texto_final = urllib.parse.quote(msg_texto)
-                link_zap = f"https://wa.me/{telefone}?text={texto_final}"
+                # 3. O LINK PERFEITO (A Mágica acontece aqui)
+                # Usamos quote() para transformar emojis em códigos (%F0%9F...)
+                # E usamos api.whatsapp.com que é mais robusto que o wa.me
+                msg_link = urllib.parse.quote(msg_texto)
+                link_zap = f"https://api.whatsapp.com/send?phone={telefone}&text={msg_link}"
                 
-                # Usamos o botão nativo do Streamlit (mais seguro contra erros de emoji)
-                st.link_button(label_botao, link_zap)
+                # 4. BOTÃO VERDE PERSONALIZADO (HTML)
+                # Criamos um botão manual com a cor exata do WhatsApp
+                st.markdown(f"""
+                <a href="{link_zap}" target="_blank" style="text-decoration: none;">
+                    <div style="
+                        background-color: #25D366;
+                        color: white;
+                        padding: 15px 20px;
+                        border-radius: 10px;
+                        text-align: center;
+                        font-weight: bold;
+                        font-size: 18px;
+                        margin-top: 20px;
+                        box-shadow: 0px 4px 6px rgba(0,0,0,0.2);
+                        transition: 0.3s;
+                        display: block;
+                        width: 100%;">
+                        {texto_botao} 💬
+                    </div>
+                </a>
+                """, unsafe_allow_html=True)
 
         except Exception as e:
             st.error(f"Erro ao gravar: {e}")
