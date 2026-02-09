@@ -45,32 +45,56 @@ if st.button("Registar Compra", type="primary"):
 
                 st.success(f"✅ Feito! {nome} tem agora {novo_total} compras.")
 
-                # --- 2. MENSAGENS FORMATADAS ---
-                # Usamos *texto* para negrito e \n para pular linha
+                # --- 2. MENSAGENS FORMATADAS (TÉCNICA DAS 3 ASPAS) ---
+                # Escrevemos exatamente como vai aparecer no WhatsApp
                 
                 if novo_total == 1:
-                    msg_texto = f"Olá, {nome}! Seja bem-vindo(a)!\n\nAcabamos de iniciar o seu fidelidade.\n *Status Atual:* 1 ponto\n *Faltam apenas:* 9 compras para o seu prémio!\n\nObrigado pela preferência!"
+                    msg_texto = f"""Olá, {nome}! Seja bem-vindo(a)!
+
+Acabamos de iniciar o seu fidelidade.
+*Status Atual:* 1 ponto
+*Faltam apenas:* 9 compras para o seu prémio!
+
+Obrigado pela preferência!"""
                     texto_botao = "Enviar Boas-Vindas"
 
                 elif novo_total < 9:
                     faltam = 10 - novo_total
-                    # AQUI ESTÁ A FORMATAÇÃO EXATA QUE PEDISTE
-                    msg_texto = f"Olá, {nome}! Que bom te ver de novo!\n\nPassando para avisar que registamos mais uma compra no seu fidelidade.\n *Status Atual:* {novo_total} pontos\n *Faltam apenas:* {faltam} compras para o seu prémio!\n\nEstamos te esperando para a próxima!"
+                    # AQUI ESTÁ A MÁGICA: O texto está visualmente separado
+                    msg_texto = f"""Olá, {nome}! Que bom te ver de novo!
+
+Passando para avisar que registamos mais uma compra.
+*Status Atual:* {novo_total} pontos
+*Faltam apenas:* {faltam} compras para o seu prémio!
+
+Estamos te esperando para a próxima!"""
                     texto_botao = f"Enviar Saldo ({novo_total}/10)"
 
                 elif novo_total == 9:
-                    msg_texto = f"Olá, {nome}! Falta muito pouco!\n\nPassando para avisar que completou 9 compras.\n *Status Atual:* 9 pontos\n *Faltam apenas:* 1 compra\n\nNa sua PRÓXIMA visita você ganha *50% DE DESCONTO*!"
+                    msg_texto = f"""Olá, {nome}! Falta muito pouco!
+
+Passando para avisar que completou 9 compras.
+*Status Atual:* 9 pontos
+*Faltam apenas:* 1 compra
+
+Na sua PRÓXIMA visita você ganha *50% DE DESCONTO*!"""
                     st.warning("⚠️ ALERTA: FALTA 1 PARA O PRÉMIO!")
                     texto_botao = "AVISAR QUE FALTA 1"
 
                 else: 
-                    msg_texto = f"PARABÉNS {nome}! Você completou o fidelidade!\n\n *Status Atual:* 10 pontos (COMPLETO)\n *Prémio:* 50% DE DESCONTO LIBERADO HOJE!\n\nO seu cartão será reiniciado agora."
+                    msg_texto = f"""PARABÉNS {nome}! Você completou o fidelidade!
+
+*Status Atual:* 10 pontos (COMPLETO)
+*Prémio:* 50% DE DESCONTO LIBERADO HOJE!
+
+O seu cartão será reiniciado agora."""
                     st.balloons()
                     texto_botao = "ENVIAR PRÉMIO AGORA"
                     
                     sheet.update_cell(linha_real, 3, 0) 
 
                 # 3. GERAR LINK
+                # O quote respeita os "Enters" que demos acima
                 msg_link = urllib.parse.quote(msg_texto)
                 link_zap = f"https://api.whatsapp.com/send?phone={telefone}&text={msg_link}"
                 
