@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
-import urllib.parse # Ferramenta essencial para os emojis funcionarem no link
+import urllib.parse # Esta é a ferramenta que arranja os emojis
 
 # Configuração da página
 st.set_page_config(page_title="Fidelidade Adega", page_icon="🍷")
@@ -45,27 +45,27 @@ if st.button("Registar Compra"):
 
                 st.success(f"✅ Sucesso! {nome} tem agora {novo_total} compras.")
 
-                # --- 2. INTELIGÊNCIA DA MENSAGEM (Com Emojis Bonitos) ---
+                # --- 2. INTELIGÊNCIA DA MENSAGEM ---
                 
-                if novo_total < 5:
-                    # Mensagem para quem está no começo
+                # CASO 1: PRIMEIRA COMPRA (Explica a regra)
+                if novo_total == 1:
+                    msg_texto = f"Olá {nome}! 🍷 Seja bem-vindo(a) à nossa Adega! Acabamos de iniciar o seu Cartão Fidelidade. Funciona assim: A cada compra você ganha 1 ponto. Ao completar 10 pontos, você ganha 50% de DESCONTO! Já tem 1 ponto garantido. Obrigado pela preferência! 🚀"
+                    aviso_botao = "📲 Enviar Boas-Vindas (Regras)"
+
+                # CASO 2: PROGRESSO NORMAL (2 até 8)
+                elif novo_total < 9:
                     faltam = 10 - novo_total
-                    msg_texto = f"Olá {nome}! 🍇 Obrigado pela preferência! Acabamos de registar a sua {novo_total}ª compra no Cartão Fidelidade. Faltam apenas {faltam} para o seu prémio de 50%! 🚀🍷"
+                    msg_texto = f"Olá {nome}! 🍷 Obrigado por voltar! Acabamos de registar a sua {novo_total}ª compra. O seu desconto de 50% está cada vez mais perto, faltam apenas {faltam} compras! Até breve! 🥂"
                     aviso_botao = f"📲 Enviar Saldo ({novo_total}/10)"
 
-                elif novo_total < 9:
-                    # Mensagem para quem está na metade
-                    faltam = 10 - novo_total
-                    msg_texto = f"Olá {nome}! 🥂 O seu cartão fidelidade está a encher! Já tem {novo_total} compras. Faltam só {faltam} para garantir os 50% de desconto. Estamos à sua espera! 🧀🍷"
-                    aviso_botao = f"📲 Avisar Cliente ({novo_total}/10)"
-
+                # CASO 3: QUASE LÁ (9)
                 elif novo_total == 9:
-                    # Mensagem de quase lá
                     msg_texto = f"Olá {nome}! 😱 Uau! Atenção: Você completou 9 compras! A sua PRÓXIMA visita vale 50% de DESCONTO. Venha logo aproveitar! 🏃‍♂️💨🍷"
                     st.warning("⚠️ ALERTA: O cliente está a 1 passo do prémio!")
                     aviso_botao = "🚨 AVISAR QUE FALTA 1!"
 
-                else: # 10 ou mais (Ciclo completado)
+                # CASO 4: PRÉMIO (10 ou mais)
+                else: 
                     msg_texto = f"PARABÉNS {nome}! 🎉🍾 Você é um cliente VIP! Completou 10 compras e ganhou 50% de DESCONTO HOJE! O seu cartão será reiniciado para ganhar de novo. Saúde! 🥂"
                     st.balloons()
                     aviso_botao = "🏆 ENVIAR PRÉMIO AGORA!"
@@ -73,8 +73,8 @@ if st.button("Registar Compra"):
                     # Opcional: Zerar a contagem na planilha automaticamente
                     sheet.update_cell(linha_real, 3, 0) 
 
-                # 3. Criar o Link Corrigido (Sem o erro do )
-                # O comando 'quote' transforma os emojis em códigos que o WhatsApp entende
+                # 3. Criar o Link Corrigido (ADEUS )
+                # O segredo está aqui: urllib.parse.quote transforma tudo em código seguro
                 msg_link = urllib.parse.quote(msg_texto)
                 link_zap = f"https://wa.me/{telefone}?text={msg_link}"
                 
