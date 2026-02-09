@@ -5,8 +5,8 @@ from oauth2client.service_account import ServiceAccountCredentials
 import urllib.parse 
 
 # --- CONFIGURAÇÃO INICIAL ---
-st.set_page_config(page_title="Controle de fidelidades", page_icon=")
-st.title("🍷 Controle de Fidelidades")
+st.set_page_config(page_title="Fidelidade Adega", page_icon="🍷")
+st.title("🍷 Fidelidade Adega Online")
 
 # --- CONEXÃO COM O GOOGLE SHEETS ---
 try:
@@ -49,11 +49,11 @@ if st.button("Registar Compra", type="primary"):
                 # Cada linha (l1, l2...) é uma parte da mensagem para garantir a quebra
                 
                 if novo_total == 1:
-                    l1 = f"Olá, {nome}! Que alegria ter você aqui na nossa Adega!"
+                    l1 = f"Olá, {nome}! Que alegria ter você aqui na nossa Adega! 🍷✨"
                     l2 = "Seja muito bem-vindo(a)! Já começamos com o pé direito o seu fidelidade."
                     l3 = "*Status Atual:* 1 ponto (O início da jornada!)"
                     l4 = "*Faltam apenas:* 9 compras para o seu super desconto!"
-                    l5 = "Muito obrigado pela preferência!"
+                    l5 = "Muito obrigado pela preferência! 🚀"
                     
                     msg_texto = f"{l1}\n\n{l2}\n{l3}\n{l4}\n\n{l5}"
                     texto_botao = "Enviar Boas-Vindas 🎉"
@@ -61,21 +61,21 @@ if st.button("Registar Compra", type="primary"):
                 elif novo_total < 9:
                     faltam = 10 - novo_total
                     
-                    l1 = f"Fala, {nome}! Tudo ótimo? Que bom te ver de novo!"
+                    l1 = f"Fala, {nome}! Tudo ótimo? Que bom te ver de novo! 😍🍷"
                     l2 = "Ficamos muito felizes com a sua visita! Já registramos aqui:"
                     l3 = f"*Status Atual:* {novo_total} pontos"
                     l4 = f"*Faltam apenas:* {faltam} compras para o prémio!"
-                    l5 = "O prémio está cada vez mais perto! Até a próxima!"
+                    l5 = "O prémio está cada vez mais perto! Até a próxima! 🥂"
                     
                     msg_texto = f"{l1}\n\n{l2}\n{l3}\n{l4}\n\n{l5}"
                     texto_botao = f"Enviar Saldo ({novo_total}/10) 📲"
 
                 elif novo_total == 9:
-                    l1 = f"UAU, {nome}!! Nunca esteve tão perto!"
+                    l1 = f"UAU, {nome}!! Pare tudo! 😱🔥"
                     l2 = "Você está a um passo da glória! Olha só isso:"
                     l3 = "*Status Atual:* 9 pontos"
-                    l4 = "*Faltam apenas:* 1 compra (É PRA FECHAR O CARTÃO!)"
-                    l5 = "Na sua PRÓXIMA compra, o desconto de 50% é SEU! já cuida em utiliza-lo! 🏃💨"
+                    l4 = "*Faltam apenas:* 1 compra (É A ÚLTIMA!)"
+                    l5 = "Na sua PRÓXIMA visita, o desconto de 50% é SEU! Vem logo! 🏃💨"
                     
                     msg_texto = f"{l1}\n\n{l2}\n{l3}\n{l4}\n\n{l5}"
                     st.warning("⚠️ ALERTA: CLIENTE ESTÁ A 1 PASSO DO PRÉMIO!")
@@ -87,7 +87,6 @@ if st.button("Registar Compra", type="primary"):
                     l3 = "*Status Atual:* 10 pontos (COMPLETO)"
                     l4 = "*Prémio:* 50% DE DESCONTO LIBERADO AGORA!"
                     l5 = "Muito obrigado pela parceria! Vamos reiniciar seu cartão para ganhar de novo! 🥂✨"
-                    16 = "Qual item você deseja usar o seu desconto"
                     
                     msg_texto = f"{l1}\n\n{l2}\n{l3}\n\n{l4}\n\n{l5}"
                     st.balloons()
