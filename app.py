@@ -5,7 +5,7 @@ from oauth2client.service_account import ServiceAccountCredentials
 import urllib.parse 
 
 # --- CONFIGURAÇÃO INICIAL ---
-st.set_page_config(page_title="Fidelidade Adega", page_icon="🍷")
+st.set_page_config(page_title="Controle Fidelidade", page_icon="🤑")
 st.title("🍷 Fidelidade Adega Online")
 
 # --- CONEXÃO COM O GOOGLE SHEETS ---
@@ -49,16 +49,16 @@ if st.button("Registar Compra", type="primary"):
                 # Podes editar o texto dentro das aspas abaixo como quiseres
                 
                 if novo_total == 1:
-                    msg_texto = f"Ola {nome}! Seja bem-vindo a nossa Adega! Ativamos o seu Cartao Fidelidade. A cada 10 compras voce ganha 50% de desconto. Voce ja tem 1 ponto. Obrigado!"
+                    msg_texto = f"Ola {nome}! Seja bem-vindo a nossa Adega! Ativamos o seu Cartao Fidelidade. A cada compras voce acumula 1 ponto, ao completar as 10 você irá ganhar 50% de desconto. Agora você ja tem 1 ponto. Obrigado!"
                     texto_botao = "Enviar Boas-Vindas"
 
                 elif novo_total < 9:
                     faltam = 10 - novo_total
-                    msg_texto = f"Ola {nome}! Registramos mais uma compra no seu cartão fidelidade. Voce tem {novo_total} pontos. Faltam apenas {faltam} para o premio🥳!"
+                    msg_texto = f"Ola {nome}! Registramos mais uma compra no seu cartão fidelidade. Voce tem {novo_total} pontos. Faltam apenas {faltam} para o premio!"
                     texto_botao = f"Enviar Saldo ({novo_total}/10)"
 
                 elif novo_total == 9:
-                    msg_texto = f"Ola {nome}! Voce completou 9 compras! Na sua PROXIMA visita voce ganha 50% DE DESCONTO. Venha aproveitar!"
+                    msg_texto = f"Ola {nome}! Você acabou de completar 9 compras! Na sua PROXIMA compra você ganhará 50% DE DESCONTO. Cuida em aproveitar!"
                     st.warning("⚠️ ALERTA: FALTA 1 PARA O PRÉMIO!")
                     texto_botao = "AVISAR QUE FALTA 1"
 
