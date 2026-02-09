@@ -11,13 +11,14 @@ import time
 # --- CONFIGURAÇÃO INICIAL ---
 st.set_page_config(page_title="Registro de Fidelidade", page_icon="🤑", layout="centered")
 
-# --- 🔒 BLOQUEIO VISUAL (REMOVE MENU, GITHUB, ETC) ---
+# --- 🔒 BLOQUEIO VISUAL (MANTÉM SETINHA DO MENU VISÍVEL) ---
 hide_streamlit_style = """
             <style>
             #MainMenu {visibility: hidden;} 
             footer {visibility: hidden;} 
-            header {visibility: hidden;} 
-            .stAppHeader {display: none;} 
+            
+            /* Esconde o cabeçalho colorido mas mantém o botão do menu clicável */
+            header {visibility: hidden;}
             
             /* Animação do Brinde */
             @keyframes bounce {
@@ -36,9 +37,9 @@ hide_streamlit_style = """
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 
 # ==========================================
-# 🔐 SISTEMA DE LOGIN (ESTÁVEL)
+# 🔐 SISTEMA DE LOGIN
 # ==========================================
-SENHA_DO_SISTEMA = "adega123"  # <--- SUA SENHA AQUI
+SENHA_DO_SISTEMA = "adega123"  # <--- SUA SENHA
 TEMPO_LIMITE_MINUTOS = 30
 
 # Inicializa variáveis
@@ -59,20 +60,20 @@ def verificar_sessao():
         return True
     return False
 
-# --- LÓGICA DO LOGIN ---
+# --- TELA DE LOGIN ---
 if not st.session_state.logado:
     if st.session_state.validando:
-        # TELA DE CARREGAMENTO (ANIMAÇÃO)
+        # ANIMAÇÃO
         st.markdown("<br><br><br>", unsafe_allow_html=True)
         st.markdown('<div class="brinde">🍻</div>', unsafe_allow_html=True)
         st.markdown("<h3 style='text-align: center;'>Abrindo a Adega...</h3>", unsafe_allow_html=True)
-        time.sleep(2.5) # Espera a animação
+        time.sleep(2.5)
         st.session_state.logado = True
         st.session_state.validando = False
         st.session_state.ultima_atividade = time.time()
         st.rerun()
     else:
-        # TELA DE SENHA
+        # FORMULÁRIO
         st.title("🔒 Adega do Barão")
         st.markdown("Acesso Restrito ao Sistema")
         with st.form("login_form"):
@@ -93,7 +94,7 @@ if not verificar_sessao():
 # 🍻 O SISTEMA COMEÇA AQUI
 # ==========================================
 
-# CABEÇALHO COM BOTÃO DE SAIR
+# CABEÇALHO DA PÁGINA
 col_tit, col_sair = st.columns([0.8, 0.2])
 with col_tit:
     st.title("🍻 Adega do Barão")
@@ -162,7 +163,68 @@ else:
     df = pd.DataFrame()
 
 # ==========================================
-# 📊 PAINEL DO PATRÃO
+# ⚙️ MENU LATERAL (ADMIN) - ELE VOLTOU!
+# ==========================================
+with st.sidebar:
+    st.header("⚙️ Menu Admin")
+    
+    # 1. Botão da Planilha
+    if "docs.google.com" in URL_PLANILHA:
+        st.link_button("📂 Abrir Planilha Google", URL_PLANILHA)
+    
+    st.divider()
+    
+    # 2. Gestão de Clientes na Lateral
+    st.subheader("Gerenciar Clientes")
+    if not df.empty and conexao:
+        df['rotulo'] = df['nome'] + " - " + df['telefone'].astype(str)
+        lista_clientes = df['rotulo'].tolist()
+        
+        cliente_selecionado = st.selectbox("Editar Cliente:", [""] + lista_clientes)
+
+        if cliente_selecionado:
+            idx = df[df['rotulo'] == cliente_selecionado].index[0]
+            dados_cli = df.iloc[idx]
+            linha_sheet = int(idx) + 2 
+            
+            with st.form("form_edicao"):
+                st.caption(f"Editando: {dados_cli['nome']}")
+                novo_nome_edit = st.text_input("Nome", value=dados_cli['nome'])
+                novo_tel_edit = st.text_input("Tel", value=dados_cli['telefone'])
+                novos_pontos_edit = st.number_input("Pontos", min_value=0, value=int(dados_cli['compras']))
+                
+                c_save, c_del = st.columns(2)
+                salvar = c_save.form_submit_button("💾")
+                excluir = c_del.form_submit_button("🗑️")
+
+            if salvar:
+                sheet_resumo.update_cell(linha_sheet, 1, novo_nome_edit.upper())
+                sheet_resumo.update_cell(linha_sheet, 2, novo_tel_edit)
+                sheet_resumo.update_cell(linha_sheet, 3, novos_pontos_edit)
+                registrar_historico(novo_nome_edit, novo_tel_edit, "Manual: Edição")
+                st.success("Salvo!")
+                st.rerun()
+
+            if excluir:
+                st.session_state.id_exclusao = linha_sheet
+                st.session_state.nome_exclusao = dados_cli['nome']
+                st.rerun()
+
+    # Confirmação de Exclusão (Fora do Form)
+    if 'id_exclusao' in st.session_state and st.session_state.id_exclusao:
+        st.error(f"Apagar **{st.session_state.nome_exclusao}**?")
+        col_x1, col_x2 = st.columns(2)
+        if col_x1.button("✅ Sim"):
+            sheet_resumo.delete_rows(st.session_state.id_exclusao)
+            registrar_historico(st.session_state.nome_exclusao, "---", "EXCLUÍDO")
+            del st.session_state.id_exclusao
+            st.rerun()
+        if col_x2.button("❌ Não"):
+            del st.session_state.id_exclusao
+            st.rerun()
+
+# ==========================================
+# 📊 PAINEL DO PATRÃO (CORPO PRINCIPAL)
 # ==========================================
 if not df.empty and conexao:
     st.markdown("### 📊 Visão Geral")
@@ -177,8 +239,8 @@ if not df.empty and conexao:
         total_vip = 0
 
     col1.metric("Clientes", total_clientes)
-    col2.metric("Pontos Totais", total_pontos)
-    col3.metric("Quase Ganhando", total_vip)
+    col2.metric("Pontos", total_pontos)
+    col3.metric("VIPs", total_vip)
     st.divider()
 
 # ==========================================
@@ -258,7 +320,7 @@ if st.session_state.confirmacao:
     st.write(f"Nome Atual: **{dados['nome_antigo']}**")
     st.info("Deseja atualizar e somar a compra?")
     
-    # AQUI FOI CORRIGIDO O INDENTATION ERROR
+    # AQUI ESTAVA O ERRO DE INDENTAÇÃO (AGORA CORRIGIDO)
     c1, c2 = st.columns(2)
     
     with c1:
@@ -319,65 +381,6 @@ if st.session_state.sucesso_msg:
     if st.button("🔄 Novo Atendimento"):
         st.session_state.sucesso_msg = None
         st.rerun()
-
-# ==========================================
-# 🛠️ GESTÃO & ADMIN (FIM DA PÁGINA)
-# ==========================================
-st.markdown("---")
-with st.expander("⚙️ Painel Administrativo (Editar, Excluir, Planilha)"):
-    
-    if "docs.google.com" in URL_PLANILHA:
-        st.link_button("📂 Abrir Planilha no Google", URL_PLANILHA)
-    
-    st.markdown("### Gerenciar Clientes")
-    if not df.empty and conexao:
-        df['rotulo'] = df['nome'] + " - " + df['telefone'].astype(str)
-        lista_clientes = df['rotulo'].tolist()
-        
-        cliente_selecionado = st.selectbox("Selecione para Editar:", [""] + lista_clientes)
-
-        if cliente_selecionado:
-            idx = df[df['rotulo'] == cliente_selecionado].index[0]
-            dados_cli = df.iloc[idx]
-            linha_sheet = int(idx) + 2 
-            
-            with st.form("form_edicao"):
-                st.write(f"Editando: **{dados_cli['nome']}**")
-                novo_nome_edit = st.text_input("Nome", value=dados_cli['nome'])
-                novo_tel_edit = st.text_input("Telefone", value=dados_cli['telefone'])
-                novos_pontos_edit = st.number_input("Pontos", min_value=0, value=int(dados_cli['compras']))
-                
-                c1, c2 = st.columns(2)
-                salvar = c1.form_submit_button("💾 Salvar")
-                excluir = c2.form_submit_button("🗑️ EXCLUIR", type="primary")
-
-            if salvar:
-                sheet_resumo.update_cell(linha_sheet, 1, novo_nome_edit.upper())
-                sheet_resumo.update_cell(linha_sheet, 2, novo_tel_edit)
-                sheet_resumo.update_cell(linha_sheet, 3, novos_pontos_edit)
-                registrar_historico(novo_nome_edit, novo_tel_edit, "Manual: Edição de dados")
-                st.success("Salvo!")
-                st.rerun()
-
-            if excluir:
-                st.session_state.id_exclusao = linha_sheet
-                st.session_state.nome_exclusao = dados_cli['nome']
-                st.rerun()
-
-        if 'id_exclusao' in st.session_state and st.session_state.id_exclusao:
-            st.error(f"⚠️ Excluir **{st.session_state.nome_exclusao}**?")
-            # CORRIGIDO: BOTOES DELETAR DENTRO DE COLUNAS COM WITH
-            cx1, cx2 = st.columns(2)
-            with cx1:
-                if st.button("Sim, Excluir"):
-                    sheet_resumo.delete_rows(st.session_state.id_exclusao)
-                    registrar_historico(st.session_state.nome_exclusao, "---", "CLIENTE EXCLUÍDO")
-                    del st.session_state.id_exclusao
-                    st.rerun()
-            with cx2:
-                if st.button("Cancelar"):
-                    del st.session_state.id_exclusao
-                    st.rerun()
 
 # ==========================================
 # 🔎 CONSULTAR HISTÓRICO
