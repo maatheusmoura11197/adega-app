@@ -65,9 +65,9 @@ if st.button("Registar Compra"):
                     faltam = 10 - novo_total
                     msg_texto = (
                         f"Olá, {nome}! Que bom te ver de novo! 😍🍷\n\n"
-                        f"Passando para avisar que registamos mais uma compra no seu fidelidade.\n"
-                        f"📊 **Status Atual:** {novo_total} pontos\n"
-                        f"🎯 **Faltam apenas:** {faltam} compras para o seu prémio!\n\n"
+                        f"Passando para avisar que registramos mais uma compra no seu fidelidade.\n"
+                        f"📊 *Status Atual:* {novo_total} pontos\n"
+                        f"🎯 *Faltam apenas:* {faltam} compras para o seu prémio!\n\n"
                         f"Estamos te esperando para a próxima! 🥂"
                     )
                     aviso_botao = f"📲 Atualizar Saldo ({novo_total}/10)"
