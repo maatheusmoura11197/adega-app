@@ -7,9 +7,22 @@ import re
 from datetime import datetime
 import pytz 
 
+# --- 🔗 LINK DA SUA PLANILHA (COLE AQUI) ---
+URL_PLANILHA = "https://docs.google.com/spreadsheets/d/191D0UIDvwDJPWRtp_0cBFS9rWaq6CkSj5ET_1HO2sLI/edit?usp=sharing" 
+
 # --- CONFIGURAÇÃO INICIAL ---
-st.set_page_config(page_title="Fidelidade Adega", page_icon="🍷")
+st.set_page_config(page_title="Fidelidade Adega", page_icon="🍷", layout="centered")
 st.title("🍷 Fidelidade Adega Online")
+
+# --- BARRA LATERAL (MENU ADMIN) ---
+with st.sidebar:
+    st.header("⚙️ Menu Rápido")
+    if "docs.google.com" in URL_PLANILHA:
+        st.link_button("📂 Abrir Planilha Google", URL_PLANILHA)
+    else:
+        st.warning("Cole o link da planilha no código para o botão funcionar.")
+    st.markdown("---")
+    st.info("Use a área de 'Gerenciar Clientes' abaixo para editar ou excluir.")
 
 # --- CONEXÃO COM O GOOGLE SHEETS ---
 try:
@@ -129,20 +142,16 @@ st.write("📞 Telefone do Cliente")
 col_ddi, col_num = st.columns([0.2, 0.8])
 
 with col_ddi:
-    # disabled=True impede que a pessoa apague o +55
     st.text_input("DDI", value="+55", disabled=True, label_visibility="collapsed")
 
 with col_num:
-    # Aqui a pessoa digita o resto
     numero_digitado = st.text_input("Número", placeholder="88 99999-0000", label_visibility="collapsed")
 
-# Juntamos as duas partes automaticamente
 telefone_completo = "+55" + numero_digitado
 telefone_limpo = limpar_telefone(telefone_completo)
 
 # --- BOTÃO DE AÇÃO ---
 if st.button("Verificar/Registar", type="primary"):
-    # Verifica se digitou algo além do +55 (tem que ter pelo menos 10 digitos no total)
     if nome and len(telefone_limpo) > 10 and conexao:
         st.session_state.sucesso_msg = None 
         
@@ -262,13 +271,85 @@ if st.session_state.sucesso_msg:
         st.rerun()
 
 # ==========================================
+# 🛠️ ÁREA DE GESTÃO (EDITAR/EXCLUIR)
+# ==========================================
+st.markdown("---")
+st.subheader("🛠️ Gerenciar Clientes (Editar ou Excluir)")
+
+if not df.empty and conexao:
+    # Cria uma lista formatada para selecionar (Nome - Telefone)
+    df['rotulo'] = df['nome'] + " - " + df['telefone'].astype(str)
+    lista_clientes = df['rotulo'].tolist()
+    
+    col_busca, col_nada = st.columns([0.8, 0.2])
+    with col_busca:
+        cliente_selecionado = st.selectbox("Selecione o Cliente para Editar:", [""] + lista_clientes)
+
+    if cliente_selecionado:
+        # Pega o índice do cliente selecionado no DataFrame
+        idx = df[df['rotulo'] == cliente_selecionado].index[0]
+        dados_cli = df.iloc[idx]
+        
+        # Como o Google Sheets tem cabeçalho na linha 1, o índice 0 do Pandas é a linha 2
+        linha_sheet = idx + 2
+        
+        st.info(f"Editando: **{dados_cli['nome']}**")
+        
+        with st.form("form_edicao"):
+            novo_nome_edit = st.text_input("Nome", value=dados_cli['nome'])
+            novo_tel_edit = st.text_input("Telefone", value=dados_cli['telefone'])
+            novos_pontos_edit = st.number_input("Pontos/Compras", min_value=0, value=int(dados_cli['compras']))
+            
+            col_save, col_del = st.columns(2)
+            
+            with col_save:
+                save_btn = st.form_submit_button("💾 Salvar Alterações")
+            with col_del:
+                del_btn = st.form_submit_button("🗑️ EXCLUIR CLIENTE", type="primary")
+
+        if save_btn:
+            with st.spinner("Salvando..."):
+                sheet_resumo.update_cell(linha_sheet, 1, novo_nome_edit.upper()) # Col 1: Nome
+                sheet_resumo.update_cell(linha_sheet, 2, novo_tel_edit)          # Col 2: Tel
+                sheet_resumo.update_cell(linha_sheet, 3, novos_pontos_edit)      # Col 3: Pontos
+                
+                registrar_historico(novo_nome_edit, novo_tel_edit, f"Manual: Dados alterados para {novos_pontos_edit} pts")
+                st.success("Dados atualizados com sucesso!")
+                st.rerun()
+
+        if del_btn:
+            # Aqui fazemos uma gambiarra segura: pedimos confirmação fora do form
+            st.session_state.id_exclusao = linha_sheet
+            st.session_state.nome_exclusao = dados_cli['nome']
+            st.rerun()
+
+    # Confirmação de Exclusão (Fora do form para funcionar o rerun)
+    if 'id_exclusao' in st.session_state and st.session_state.id_exclusao:
+        st.error(f"⚠️ Tem certeza que deseja excluir **{st.session_state.nome_exclusao}**? Essa ação não tem volta.")
+        col_conf1, col_conf2 = st.columns(2)
+        if col_conf1.button("Sim, Excluir Definitivamente"):
+            with st.spinner("Excluindo..."):
+                sheet_resumo.delete_rows(st.session_state.id_exclusao)
+                registrar_historico(st.session_state.nome_exclusao, "---", "CLIENTE EXCLUÍDO MANUALMENTE")
+                st.success("Cliente removido.")
+                # Limpa estados
+                del st.session_state.id_exclusao
+                del st.session_state.nome_exclusao
+                st.rerun()
+        
+        if col_conf2.button("Cancelar"):
+            del st.session_state.id_exclusao
+            del st.session_state.nome_exclusao
+            st.rerun()
+
+# ==========================================
 # 🔎 CONSULTAR HISTÓRICO
 # ==========================================
 st.markdown("---")
 st.subheader("🔎 Consultar Histórico")
 
-busca_tel_input = st.text_input("Pesquisar Telefone", placeholder="Ex: 88999...")
-busca_tel = limpar_telefone("55" + busca_tel_input) # Adiciona 55 na busca tb
+busca_tel_input = st.text_input("Pesquisar Telefone no Histórico", placeholder="Ex: 88999...")
+busca_tel = limpar_telefone("55" + busca_tel_input)
 
 if st.button("Buscar Histórico"):
     if len(busca_tel) > 5:
@@ -277,7 +358,6 @@ if st.button("Buscar Histórico"):
             df_hist = pd.DataFrame(dados_hist)
             df_hist['Telefone'] = df_hist['Telefone'].astype(str)
             
-            # Tenta buscar com 55 ou sem 55 para garantir
             resultado = df_hist[df_hist['Telefone'].str.contains(busca_tel_input)]
             
             if not resultado.empty:
