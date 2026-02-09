@@ -36,7 +36,7 @@ def gerar_mensagem_zap(nome_cliente, total_compras):
     """Gera o texto carismático e formatado"""
     if total_compras == 1:
         l1 = f"Olá, {nome_cliente}! Que alegria ter você aqui na nossa Adega! 🍷✨"
-        l2 = "Seja muito bem-vindo(a)! Já começamos com o pé direito o seu fidelidade."
+        l2 = "Seja muito bem-vindo(a)! Já começamos com o pé direito o seu cartão fidelidade."
         l3 = "*Status Atual:* 1 ponto (O início da jornada!)"
         l4 = "*Faltam apenas:* 9 compras para o seu super desconto!"
         l5 = "Muito obrigado pela preferência! 🚀"
@@ -106,7 +106,6 @@ if not df.empty and conexao:
         total_vip = 0
 
     col1.metric("Clientes", total_clientes)
-    col2.metric("Pontos Dados", total_pontos)
     col3.metric("Quase Ganhando", total_vip)
     st.divider()
 
