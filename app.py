@@ -11,7 +11,7 @@ import time
 # --- CONFIGURAÇÃO INICIAL ---
 st.set_page_config(page_title="Registro de Fidelidade", page_icon="🤑", layout="centered")
 
-# --- 🔒 BLOQUEIO VISUAL (CORRIGIDO PARA O MENU APARECER) ---
+# --- 🔒 BLOQUEIO VISUAL (CORREÇÃO PARA CELULAR) ---
 hide_streamlit_style = """
             <style>
             /* 1. Esconde o Menu de 3 pontinhos e o Rodapé */
@@ -20,7 +20,7 @@ hide_streamlit_style = """
             
             /* 2. Esconde a barra colorida no topo (decoração) */
             [data-testid="stDecoration"] {
-                display: none;
+                visibility: hidden;
             }
             
             /* 3. Esconde os botões da direita (Deploy, GitHub, Settings) */
@@ -28,10 +28,17 @@ hide_streamlit_style = """
                 visibility: hidden;
             }
             
-            /* 4. GARANTE QUE O CABEÇALHO (ONDE FICA O MENU) ESTEJA VISÍVEL */
+            /* 4. IMPORTANTE: Mantém o cabeçalho VISÍVEL para a setinha do menu aparecer */
             header {
                 visibility: visible !important;
                 background: transparent !important;
+            }
+            
+            /* 5. Força o botão do menu lateral a aparecer e ter cor */
+            [data-testid="stSidebarCollapsedControl"] {
+                visibility: visible !important;
+                display: block !important;
+                color: #31333F !important; /* Cor escura para garantir que vê */
             }
             
             /* Animação do Brinde */
