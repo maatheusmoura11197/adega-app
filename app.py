@@ -5,7 +5,7 @@ import pandas as pd
 # 1. Abre a tua folha no Google Sheets
 # 2. Clica em Partilhar -> Qualquer pessoa com o link -> Editor
 # 3. Cola o link aqui entre as aspas:
-LINK_GOOGLE = "COLA_AQUI_O_TEU_LINK_DO_GOOGLE_SHEETS"
+LINK_GOOGLE = "https://docs.google.com/spreadsheets/d/191D0UIDvwDJPWRtp_0cBFS9rWaq6CkSj5ET_1HO2sLI/edit?usp=sharing"
 
 # Esta linha transforma o link normal num link que o Python consegue ler
 if "edit?usp=sharing" in LINK_GOOGLE:
