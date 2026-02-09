@@ -45,27 +45,28 @@ if st.button("Registar Compra", type="primary"):
 
                 st.success(f"✅ Feito! {nome} tem agora {novo_total} compras.")
 
-                # --- 2. MENSAGENS ORGANIZADAS (UM EMBAIXO DO OUTRO) ---
-                # O segredo é o \n que pula a linha
+                # --- 2. MENSAGENS FORMATADAS ---
+                # Usamos *texto* para negrito e \n para pular linha
                 
                 if novo_total == 1:
-                    msg_texto = f"Ola {nome}! Seja bem-vindo a nossa Adega!\n\nStatus Atual: 1 ponto\nFaltam apenas: 9 compras\n\nJunte 10 pontos e ganhe 50% de desconto. Obrigado!"
+                    msg_texto = f"Olá, {nome}! Seja bem-vindo(a)!\n\nAcabamos de iniciar o seu fidelidade.\n *Status Atual:* 1 ponto\n *Faltam apenas:* 9 compras para o seu prémio!\n\nObrigado pela preferência!"
                     texto_botao = "Enviar Boas-Vindas"
 
                 elif novo_total < 9:
                     faltam = 10 - novo_total
-                    msg_texto = f"Ola {nome}! Registramos mais uma compra.\n\nStatus Atual: {novo_total} pontos\nFaltam apenas: {faltam} compras\n\nContinue comprando para ganhar seu premio!"
+                    # AQUI ESTÁ A FORMATAÇÃO EXATA QUE PEDISTE
+                    msg_texto = f"Olá, {nome}! Que bom te ver de novo!\n\nPassando para avisar que registamos mais uma compra no seu fidelidade.\n *Status Atual:* {novo_total} pontos\n *Faltam apenas:* {faltam} compras para o seu prémio!\n\nEstamos te esperando para a próxima!"
                     texto_botao = f"Enviar Saldo ({novo_total}/10)"
 
                 elif novo_total == 9:
-                    msg_texto = f"Ola {nome}! Falta muito pouco!\n\nStatus Atual: 9 pontos\nFaltam apenas: 1 compra\n\nNa sua PROXIMA visita voce ganha 50% DE DESCONTO!"
+                    msg_texto = f"Olá, {nome}! Falta muito pouco!\n\nPassando para avisar que completou 9 compras.\n *Status Atual:* 9 pontos\n *Faltam apenas:* 1 compra\n\nNa sua PRÓXIMA visita você ganha *50% DE DESCONTO*!"
                     st.warning("⚠️ ALERTA: FALTA 1 PARA O PRÉMIO!")
                     texto_botao = "AVISAR QUE FALTA 1"
 
                 else: 
-                    msg_texto = f"PARABENS {nome}! Voce completou o fidelidade!\n\nStatus Atual: 10 pontos (COMPLETO)\nPremio: 50% DE DESCONTO LIBERADO HOJE!\n\nO seu cartao sera reiniciado agora."
+                    msg_texto = f"PARABÉNS {nome}! Você completou o fidelidade!\n\n *Status Atual:* 10 pontos (COMPLETO)\n *Prémio:* 50% DE DESCONTO LIBERADO HOJE!\n\nO seu cartão será reiniciado agora."
                     st.balloons()
-                    texto_botao = "ENVIAR PREMIO AGORA"
+                    texto_botao = "ENVIAR PRÉMIO AGORA"
                     
                     sheet.update_cell(linha_real, 3, 0) 
 
