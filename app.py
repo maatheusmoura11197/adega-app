@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
-import urllib.parse # Para arranjar os acentos no link do WhatsApp
+import urllib.parse # Ferramenta essencial para os emojis funcionarem no link
 
 # Configuração da página
 st.set_page_config(page_title="Fidelidade Adega", page_icon="🍷")
@@ -43,50 +43,56 @@ if st.button("Registar Compra"):
                     sheet.update_cell(linha_real, 3, novo_total)
                     st.toast(f"🔄 Compra somada!")
 
-                st.success(f"✅ Feito! {nome} tem agora {novo_total} compras.")
+                st.success(f"✅ Sucesso! {nome} tem agora {novo_total} compras.")
 
-                # --- 2. INTELIGÊNCIA DA MENSAGEM DO WHATSAPP ---
-                # Aqui definimos qual mensagem enviar dependendo do número de compras
+                # --- 2. INTELIGÊNCIA DA MENSAGEM (Com Emojis Bonitos) ---
                 
-                if novo_total < 9:
+                if novo_total < 5:
+                    # Mensagem para quem está no começo
                     faltam = 10 - novo_total
-                    msg_texto = f"Olá {nome}! 🍷 Obrigado pela preferência! Você já completou {novo_total} compras no nosso cartão fidelidade. Faltam apenas {faltam} para ganhar 50% de desconto!"
-                    cor_botao = "primary" # Botão normal
-                    aviso = f"📲 Enviar comprovante ({novo_total}/10)"
+                    msg_texto = f"Olá {nome}! 🍇 Obrigado pela preferência! Acabamos de registar a sua {novo_total}ª compra no Cartão Fidelidade. Faltam apenas {faltam} para o seu prémio de 50%! 🚀🍷"
+                    aviso_botao = f"📲 Enviar Saldo ({novo_total}/10)"
+
+                elif novo_total < 9:
+                    # Mensagem para quem está na metade
+                    faltam = 10 - novo_total
+                    msg_texto = f"Olá {nome}! 🥂 O seu cartão fidelidade está a encher! Já tem {novo_total} compras. Faltam só {faltam} para garantir os 50% de desconto. Estamos à sua espera! 🧀🍷"
+                    aviso_botao = f"📲 Avisar Cliente ({novo_total}/10)"
 
                 elif novo_total == 9:
-                    msg_texto = f"Olá {nome}! 🍷 Uau! Você chegou a 9 compras. Na sua PRÓXIMA visita, você ganha 50% de desconto! Não perca!"
-                    st.warning("⚠️ O cliente está a 1 passo do prémio!")
-                    cor_botao = "primary"
-                    aviso = "📲 Avisar que falta 1!"
+                    # Mensagem de quase lá
+                    msg_texto = f"Olá {nome}! 😱 Uau! Atenção: Você completou 9 compras! A sua PRÓXIMA visita vale 50% de DESCONTO. Venha logo aproveitar! 🏃‍♂️💨🍷"
+                    st.warning("⚠️ ALERTA: O cliente está a 1 passo do prémio!")
+                    aviso_botao = "🚨 AVISAR QUE FALTA 1!"
 
-                else: # 10 ou mais
-                    msg_texto = f"Olá {nome}! 🎉 Parabéns! Completou 10 compras e ganhou 50% de desconto HOJE! O seu cartão fidelidade será reiniciado."
+                else: # 10 ou mais (Ciclo completado)
+                    msg_texto = f"PARABÉNS {nome}! 🎉🍾 Você é um cliente VIP! Completou 10 compras e ganhou 50% de DESCONTO HOJE! O seu cartão será reiniciado para ganhar de novo. Saúde! 🥂"
                     st.balloons()
-                    cor_botao = "primary" # O Streamlit não deixa mudar cor facilmente, mas o destaque é o balão
-                    aviso = "🎁 ENVIAR PRÉMIO AGORA!"
+                    aviso_botao = "🏆 ENVIAR PRÉMIO AGORA!"
                     
-                    # Zerar a contagem na planilha (opcional, se quiseres manter o ciclo)
-                    # sheet.update_cell(linha_real, 3, 0) 
+                    # Opcional: Zerar a contagem na planilha automaticamente
+                    sheet.update_cell(linha_real, 3, 0) 
 
-                # 3. Criar o Link e Mostrar o Botão
-                # Codifica a mensagem para aceitar espaços e acentos no link
+                # 3. Criar o Link Corrigido (Sem o erro do )
+                # O comando 'quote' transforma os emojis em códigos que o WhatsApp entende
                 msg_link = urllib.parse.quote(msg_texto)
                 link_zap = f"https://wa.me/{telefone}?text={msg_link}"
                 
+                # Botão verde bonito
                 st.markdown(f"""
-                <a href="{link_zap}" target="_blank">
+                <a href="{link_zap}" target="_blank" style="text-decoration: none;">
                     <button style="
                         width: 100%;
-                        background-color: #25D366;
-                        color: white;
-                        padding: 15px;
-                        border: none;
-                        border-radius: 10px;
-                        font-size: 18px;
-                        font-weight: bold;
+                        background-color: #25D366; 
+                        color: white; 
+                        padding: 15px; 
+                        border-radius: 12px; 
+                        border: none; 
+                        font-size: 18px; 
+                        font-weight: bold; 
+                        box-shadow: 0px 4px 6px rgba(0,0,0,0.2);
                         cursor: pointer;">
-                        {aviso} 
+                        {aviso_botao}
                     </button>
                 </a>
                 """, unsafe_allow_html=True)
