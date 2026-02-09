@@ -21,9 +21,9 @@ except Exception as e:
 
 # --- DADOS DO CLIENTE ---
 nome = st.text_input("Nome do Cliente").strip().upper()
-telefone = st.text_input("Telefone (com DDD, apenas números)").strip()
+telefone = st.text_input("Telefone (com DDD, e +55)").strip()
 
-if st.button("Registar Compra", type="primary"):
+if st.button("Registar", type="primary"):
     if nome and telefone and conexao:
         try:
             with st.spinner('A processar com carinho...'):
