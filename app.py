@@ -1,64 +1,42 @@
 import streamlit as st
 import pandas as pd
-import gspread
-from oauth2client.service_account import ServiceAccountCredentials
+
+# O LINK DA TUA FOLHA (Já coloquei o teu link correto aqui)
+LINK_GOOGLE = "https://docs.google.com/spreadsheets/d/191D0UIDvwDJPWRtp_0cBFS9rWaq6CkSj5ET_1HO2sLI/export?format=csv"
 
 st.set_page_config(page_title="Fidelidade Adega", page_icon="🍷")
 st.title("🍷 Fidelidade Adega Online")
 
-# Configuração para ligar ao Google Sheets
-# O Streamlit vai procurar as senhas nos "Secrets" que vamos configurar a seguir
-try:
-    scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-    # Aqui ele busca a senha secreta que vamos criar
-    creds = ServiceAccountCredentials.from_json_keyfile_dict(st.secrets["gcp_service_account"], scope)
-    client = gspread.authorize(creds)
-    
-    # Abre a planilha pelo nome (tem de ser exato)
-    sheet = client.open("Fidelidade").sheet1
-    conexao_ok = True
-except:
-    conexao_ok = False
-    st.warning("⚠️ A configurar conexão... (Ainda falta a Chave Secreta)")
-
+# Interface do Utilizador
 nome = st.text_input("Nome do Cliente").strip().upper()
-telefone = st.text_input("Telefone (com DDD)").strip()
+telefone = st.text_input("Telefone (com o 55 da frente)").strip()
 
 if st.button("Registar Compra"):
-    if nome and telefone and conexao_ok:
+    if nome and telefone:
         try:
-            # 1. Busca todos os dados da planilha
-            dados = sheet.get_all_records()
-            df = pd.DataFrame(dados)
-
-            # 2. Procura o cliente
-            # Se a planilha estiver vazia ou cliente nao existir
-            if df.empty or nome not in df['nome'].values:
-                # Adiciona nova linha no Google Sheets
-                sheet.append_row([nome, telefone, 1])
-                total = 1
-                st.toast(f"Novo cliente {nome} cadastrado!")
-            else:
-                # Encontra a linha do cliente e soma +1
-                # (O gspread usa linhas começando em 1, e cabeçalho é linha 1, então somamos +2 no index)
-                idx = df[df['nome'] == nome].index[0]
-                linha_excel = idx + 2 
-                compras_atuais = df.loc[idx, 'compras']
-                total = compras_atuais + 1
-                sheet.update_cell(linha_excel, 3, int(total))
+            # Tenta ler a folha
+            df = pd.read_csv(LINK_GOOGLE)
             
-            st.success(f"✅ Registado! {nome} tem agora {total} compras.")
+            # Procura o cliente
+            if nome in df['nome'].values:
+                # Se encontrar, mostra o valor que está lá + 1
+                compras_na_folha = df.loc[df['nome'] == nome, 'compras'].values[0]
+                total = compras_na_folha + 1
+            else:
+                total = 1
+            
+            st.success(f"Sucesso! {nome} tem agora {total} compras.")
+            
+            # --- ATENÇÃO ---
+            # Para o Python GRAVAR na folha, precisamos de configurar as 'Secrets' no Streamlit.
+            # Enquanto não fazemos isso, o valor só aparece na tela.
+            st.warning("⚠️ O sistema está em modo de teste. Os dados ainda não estão a ser gravados na folha do Google.")
 
-            # 3. Verifica Fidelidade
             if total >= 9:
                 st.balloons()
-                msg = f"Ola {nome}! Completaste {total} compras. Ganhaste 50% de desconto na proxima!"
-                link = f"https://wa.me/{telefone}?text={msg.replace(' ', '%20')}"
-                st.markdown(f"### [🎁 CLIQUE AQUI PARA ENVIAR WHATSAPP]({link})")
+                msg = f"Ola {nome}! Voce ganhou 50% de desconto na sua 10ª compra!"
+                link_zap = f"https://wa.me/{telefone}?text={msg.replace(' ', '%20')}"
+                st.markdown(f"### [CLIQUE AQUI PARA MANDAR WHATSAPP]({link_zap})")
 
         except Exception as e:
-            st.error(f"Erro na gravação: {e}")
-    elif not conexao_ok:
-        st.error("Ainda falta configurar a Chave Secreta no site!")
-    else:
-        st.warning("Preenche o nome e telefone.")
+            st.error(f"Erro ao ler a folha: {e}")
