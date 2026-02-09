@@ -4,7 +4,8 @@ import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import urllib.parse 
 import re 
-import time
+from datetime import datetime
+import pytz # Para pegar o horário do Brasil
 
 # --- CONFIGURAÇÃO INICIAL ---
 st.set_page_config(page_title="Fidelidade Adega", page_icon="🍷")
@@ -25,6 +26,11 @@ except Exception as e:
 def limpar_telefone(tel):
     """Remove tudo que não for número"""
     return re.sub(r'\D', '', tel)
+
+def pegar_data_hora():
+    """Pega a data e hora atual de Brasília"""
+    fuso = pytz.timezone('America/Sao_Paulo')
+    return datetime.now(fuso).strftime('%d/%m/%Y %H:%M')
 
 def gerar_mensagem_zap(nome_cliente, total_compras):
     """Gera o texto carismático e formatado"""
@@ -68,7 +74,6 @@ def gerar_mensagem_zap(nome_cliente, total_compras):
     return msg, btn
 
 # --- ESTADO DA SESSÃO (MEMÓRIA) ---
-# Isso impede que o sistema "esqueça" o que estava fazendo
 if 'confirmacao' not in st.session_state:
     st.session_state.confirmacao = False
 if 'dados_temp' not in st.session_state:
@@ -76,7 +81,37 @@ if 'dados_temp' not in st.session_state:
 if 'sucesso_msg' not in st.session_state:
     st.session_state.sucesso_msg = None
 
-# --- INTERFACE ---
+# --- CARREGAR DADOS INICIAIS ---
+if conexao:
+    todos_dados = sheet.get_all_records()
+    df = pd.DataFrame(todos_dados)
+else:
+    df = pd.DataFrame()
+
+# ==========================================
+# 📊 OPÇÃO 4: O PAINEL DO PATRÃO (DASHBOARD)
+# ==========================================
+if not df.empty and conexao:
+    st.markdown("### 📊 Visão Geral da Adega")
+    col1, col2, col3 = st.columns(3)
+    
+    total_clientes = len(df)
+    # Tenta somar as compras, se a coluna existir e tiver numeros
+    try:
+        total_pontos = df['compras'].sum()
+        # Clientes VIPs (com 9 ou 10 pontos)
+        total_vip = len(df[df['compras'] >= 9])
+    except:
+        total_pontos = 0
+        total_vip = 0
+
+    col1.metric("Clientes", total_clientes)
+    col2.metric("Pontos Dados", total_pontos)
+    col3.metric("Quase Ganhando", total_vip)
+    st.divider()
+
+# --- INTERFACE DE REGISTRO ---
+st.subheader("📝 Novo Registro")
 nome = st.text_input("Nome do Cliente").strip().upper()
 telefone_input = st.text_input("Telefone", value="+55 ", help="Apenas digite, eu arrumo os números.")
 telefone_limpo = limpar_telefone(telefone_input)
@@ -84,117 +119,105 @@ telefone_limpo = limpar_telefone(telefone_input)
 # --- BOTÃO 1: VERIFICAR ---
 if st.button("Verificar e Registar", type="primary"):
     if nome and telefone_limpo and conexao:
-        st.session_state.sucesso_msg = None # Limpa msg anterior
+        st.session_state.sucesso_msg = None 
         
-        with st.spinner('Verificando na planilha...'):
-            todos_dados = sheet.get_all_records()
-            df = pd.DataFrame(todos_dados)
+        # Converte coluna telefone para texto para comparar
+        if not df.empty:
+            df['telefone'] = df['telefone'].astype(str)
+            cliente_encontrado = df[df['telefone'] == telefone_limpo]
+        else:
+            cliente_encontrado = pd.DataFrame()
+
+        if not cliente_encontrado.empty:
+            # CASO 1: JÁ EXISTE -> Confirmação
+            dados_existentes = cliente_encontrado.iloc[0]
+            idx = cliente_encontrado.index[0]
             
-            # Converte coluna telefone para texto para comparar
-            if not df.empty:
-                df['telefone'] = df['telefone'].astype(str)
-                cliente_encontrado = df[df['telefone'] == telefone_limpo]
-            else:
-                cliente_encontrado = pd.DataFrame()
+            st.session_state.dados_temp = {
+                'indice': idx,
+                'nome_antigo': dados_existentes['nome'],
+                'nome_novo': nome,
+                'telefone': telefone_limpo,
+                'compras_atuais': dados_existentes['compras']
+            }
+            st.session_state.confirmacao = True
+            st.rerun()
 
-            if not cliente_encontrado.empty:
-                # CASO 1: JÁ EXISTE -> Ativa modo confirmação
-                dados_existentes = cliente_encontrado.iloc[0]
-                idx = cliente_encontrado.index[0]
-                
-                st.session_state.dados_temp = {
-                    'indice': idx,
-                    'nome_antigo': dados_existentes['nome'],
-                    'nome_novo': nome,
-                    'telefone': telefone_limpo,
-                    'compras_atuais': dados_existentes['compras']
-                }
-                st.session_state.confirmacao = True
-                st.rerun() # Recarrega a página para mostrar o alerta
-
-            else:
-                # CASO 2: NOVO -> Grava direto
-                sheet.append_row([nome, telefone_limpo, 1])
-                
-                # Prepara o sucesso
-                msg, btn_txt = gerar_mensagem_zap(nome, 1)
-                msg_link = urllib.parse.quote(msg)
-                link_zap = f"https://api.whatsapp.com/send?phone={telefone_limpo}&text={msg_link}"
-                
-                st.session_state.sucesso_msg = {
-                    'texto': f"🎉 Novo cliente {nome} cadastrado com 1 compra!",
-                    'link': link_zap,
-                    'btn_label': btn_txt
-                }
-                st.rerun()
+        else:
+            # CASO 2: NOVO -> Grava direto com DATA (OPÇÃO 2)
+            data_hoje = pegar_data_hora()
+            
+            # Adicionamos a data na 4ª coluna
+            sheet.append_row([nome, telefone_limpo, 1, data_hoje])
+            
+            msg, btn_txt = gerar_mensagem_zap(nome, 1)
+            msg_link = urllib.parse.quote(msg)
+            link_zap = f"https://api.whatsapp.com/send?phone={telefone_limpo}&text={msg_link}"
+            
+            st.session_state.sucesso_msg = {
+                'texto': f"🎉 Novo cliente {nome} cadastrado em {data_hoje}!",
+                'link': link_zap,
+                'btn_label': btn_txt
+            }
+            st.rerun()
 
     elif not conexao:
         st.error("Sem conexão com o Google.")
     else:
         st.warning("Preencha o nome e o telefone.")
 
-# --- ZONA DE CONFIRMAÇÃO (FORA DO BOTÃO ANTERIOR) ---
+# --- ZONA DE CONFIRMAÇÃO ---
 if st.session_state.confirmacao:
     dados = st.session_state.dados_temp
     
     st.divider()
-    st.warning(f"🚨 **ESSE NÚMERO JÁ EXISTE!**")
+    st.warning(f"🚨 **CLIENTE JÁ CADASTRADO!**")
     st.write(f"📞 Telefone: **{dados['telefone']}**")
     st.write(f"👤 Nome na Planilha: **{dados['nome_antigo']}**")
-    st.write(f"📝 Nome que você digitou: **{dados['nome_novo']}**")
-    st.info("Deseja atualizar o nome para o novo e somar a compra?")
+    st.info("Deseja atualizar e somar a compra?")
     
     col1, col2 = st.columns(2)
     
     with col1:
-        if st.button("✅ SIM, Atualizar e Somar"):
+        if st.button("✅ SIM, Atualizar"):
             with st.spinner('Atualizando...'):
-                # Calcula linha (Pandas começa em 0, Sheets tem cabeçalho, então +2)
                 linha_real = dados['indice'] + 2
                 novo_total = int(dados['compras_atuais']) + 1
+                data_hoje = pegar_data_hora() # Pega data atual
                 
-                # Atualiza Nome e Compras
-                sheet.update_cell(linha_real, 1, dados['nome_novo']) # Coluna 1 = Nome
-                sheet.update_cell(linha_real, 3, novo_total)         # Coluna 3 = Compras
+                # Atualiza Nome, Compras e DATA (OPÇÃO 2)
+                sheet.update_cell(linha_real, 1, dados['nome_novo']) 
+                sheet.update_cell(linha_real, 3, novo_total)
+                sheet.update_cell(linha_real, 4, data_hoje) # Atualiza a coluna 4
                 
-                # Verifica se zerou (ciclo de 10)
-                if novo_total >= 10:
-                     # Nota: Se quiser zerar automático, descomente a linha abaixo
-                     # sheet.update_cell(linha_real, 3, 0)
-                     pass
-
-                # Prepara sucesso
                 msg, btn_txt = gerar_mensagem_zap(dados['nome_novo'], novo_total)
                 msg_link = urllib.parse.quote(msg)
                 link_zap = f"https://api.whatsapp.com/send?phone={dados['telefone']}&text={msg_link}"
                 
                 st.session_state.sucesso_msg = {
-                    'texto': f"✅ Atualizado! {dados['nome_novo']} agora tem {novo_total} compras.",
+                    'texto': f"✅ Atualizado! {dados['nome_novo']} agora tem {novo_total} compras. (Última: {data_hoje})",
                     'link': link_zap,
                     'btn_label': btn_txt,
-                    'salao_festa': (novo_total >= 10) # Marca se tem festa
+                    'salao_festa': (novo_total >= 10)
                 }
                 
-                # Limpa confirmação e recarrega
                 st.session_state.confirmacao = False
                 st.rerun()
 
     with col2:
-        if st.button("❌ NÃO, Cancelar"):
+        if st.button("❌ Cancelar"):
             st.session_state.confirmacao = False
             st.rerun()
 
-# --- ZONA DE SUCESSO (ONDE APARECE O BOTÃO VERDE) ---
+# --- ZONA DE SUCESSO ---
 if st.session_state.sucesso_msg:
     resultado = st.session_state.sucesso_msg
-    
     st.divider()
     st.success(resultado['texto'])
     
     if resultado.get('salao_festa'):
         st.balloons()
 
-    # Botão HTML Verde
     st.markdown(f"""
     <a href="{resultado['link']}" target="_blank" style="text-decoration: none;">
         <div style="
@@ -214,7 +237,6 @@ if st.session_state.sucesso_msg:
     </a>
     """, unsafe_allow_html=True)
     
-    # Botão para limpar a tela e começar novo atendimento
     if st.button("🔄 Novo Atendimento"):
         st.session_state.sucesso_msg = None
         st.rerun()
