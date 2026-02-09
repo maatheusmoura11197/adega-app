@@ -5,8 +5,8 @@ from oauth2client.service_account import ServiceAccountCredentials
 import urllib.parse 
 
 # --- CONFIGURAÇÃO INICIAL ---
-st.set_page_config(page_title="Controle Fidelidade", page_icon="🍺")
-st.title("🤑 Fidelidade Adega Online")
+st.set_page_config(page_title="Fidelidade Adega", page_icon="🍷")
+st.title("🍷 Fidelidade Adega Online")
 
 # --- CONEXÃO COM O GOOGLE SHEETS ---
 try:
@@ -45,35 +45,35 @@ if st.button("Registar Compra", type="primary"):
 
                 st.success(f"✅ Feito! {nome} tem agora {novo_total} compras.")
 
-                # --- 2. MENSAGENS (TEXTO PADRÃO) ---
-                # Podes editar o texto dentro das aspas abaixo como quiseres
+                # --- 2. MENSAGENS ORGANIZADAS (UM EMBAIXO DO OUTRO) ---
+                # O segredo é o \n que pula a linha
                 
                 if novo_total == 1:
-                    msg_texto = f"Ola {nome}! Seja bem-vindo a nossa Adega! Ativamos o seu Cartao Fidelidade. A cada compras voce acumula 1 ponto, ao completar as 10 você irá ganhar 50% de desconto. Agora você ja tem 1 ponto. Obrigado!"
+                    msg_texto = f"Ola {nome}! Seja bem-vindo a nossa Adega!\n\nStatus Atual: 1 ponto\nFaltam apenas: 9 compras\n\nJunte 10 pontos e ganhe 50% de desconto. Obrigado!"
                     texto_botao = "Enviar Boas-Vindas"
 
                 elif novo_total < 9:
                     faltam = 10 - novo_total
-                    msg_texto = f"Ola {nome}! Registramos mais uma compra no seu cartão fidelidade. Voce tem {novo_total} pontos. Faltam apenas {faltam} para o premio!"
+                    msg_texto = f"Ola {nome}! Registramos mais uma compra.\n\nStatus Atual: {novo_total} pontos\nFaltam apenas: {faltam} compras\n\nContinue comprando para ganhar seu premio!"
                     texto_botao = f"Enviar Saldo ({novo_total}/10)"
 
                 elif novo_total == 9:
-                    msg_texto = f"Ola {nome}! Você acabou de completar 9 compras! Na sua PROXIMA compra você ganhará 50% DE DESCONTO. Cuida em aproveitar!"
+                    msg_texto = f"Ola {nome}! Falta muito pouco!\n\nStatus Atual: 9 pontos\nFaltam apenas: 1 compra\n\nNa sua PROXIMA visita voce ganha 50% DE DESCONTO!"
                     st.warning("⚠️ ALERTA: FALTA 1 PARA O PRÉMIO!")
                     texto_botao = "AVISAR QUE FALTA 1"
 
                 else: 
-                    msg_texto = f"PARABENS {nome}! Voce completou 10 compras e ganhou 50% DE DESCONTO HOJE! O seu cartao sera reiniciado."
+                    msg_texto = f"PARABENS {nome}! Voce completou o fidelidade!\n\nStatus Atual: 10 pontos (COMPLETO)\nPremio: 50% DE DESCONTO LIBERADO HOJE!\n\nO seu cartao sera reiniciado agora."
                     st.balloons()
                     texto_botao = "ENVIAR PREMIO AGORA"
                     
                     sheet.update_cell(linha_real, 3, 0) 
 
-                # 3. LINK WHATSAPP (Via API Oficial)
+                # 3. GERAR LINK
                 msg_link = urllib.parse.quote(msg_texto)
                 link_zap = f"https://api.whatsapp.com/send?phone={telefone}&text={msg_link}"
                 
-                # 4. BOTÃO VERDE (HTML SIMPLES)
+                # 4. BOTÃO VERDE
                 st.markdown(f"""
                 <a href="{link_zap}" target="_blank" style="text-decoration: none;">
                     <div style="
