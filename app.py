@@ -3,6 +3,7 @@ import pandas as pd
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import urllib.parse 
+import re # Ferramenta para limpar o telefone
 
 # --- CONFIGURAÇÃO INICIAL ---
 st.set_page_config(page_title="Fidelidade Adega", page_icon="🍷")
@@ -21,10 +22,16 @@ except Exception as e:
 
 # --- DADOS DO CLIENTE ---
 nome = st.text_input("Nome do Cliente").strip().upper()
-telefone = st.text_input("Telefone (com DDD, e +55)").strip()
+
+# Aqui colocamos o +55 como valor padrão para facilitar
+telefone_input = st.text_input("Telefone (DDD + Número)", value="+55 ", help="Ex: +55 88 99995-7161")
+
+# LIMPEZA AUTOMÁTICA DO TELEFONE
+# O sistema remove espaços, traços e parênteses para garantir que o link funcione
+telefone_limpo = re.sub(r'\D', '', telefone_input) # Deixa apenas números
 
 if st.button("Registar", type="primary"):
-    if nome and telefone and conexao:
+    if nome and telefone_limpo and conexao:
         try:
             with st.spinner('A processar com carinho...'):
                 # 1. LER DADOS
@@ -33,7 +40,7 @@ if st.button("Registar", type="primary"):
                 
                 novo_total = 1
                 if df.empty or nome not in df['nome'].values:
-                    sheet.append_row([nome, telefone, 1])
+                    sheet.append_row([nome, telefone_limpo, 1])
                     st.toast(f"🎉 Novo cliente na casa!")
                 else:
                     indice = df[df['nome'] == nome].index[0]
@@ -46,7 +53,6 @@ if st.button("Registar", type="primary"):
                 st.success(f"✅ Maravilha! {nome} agora tem {novo_total} compras.")
 
                 # --- 2. MENSAGENS CHEIAS DE CARISMA ---
-                # Cada linha (l1, l2...) é uma parte da mensagem para garantir a quebra
                 
                 if novo_total == 1:
                     l1 = f"Olá, {nome}! Que alegria ter você aqui na nossa Adega!"
@@ -96,7 +102,8 @@ if st.button("Registar", type="primary"):
 
                 # 3. GERAR LINK
                 msg_link = urllib.parse.quote(msg_texto)
-                link_zap = f"https://api.whatsapp.com/send?phone={telefone}&text={msg_link}"
+                # Usamos a variável 'telefone_limpo' para garantir que o link não quebre
+                link_zap = f"https://api.whatsapp.com/send?phone={telefone_limpo}&text={msg_link}"
                 
                 # 4. BOTÃO VERDE
                 st.markdown(f"""
