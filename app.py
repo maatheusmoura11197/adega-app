@@ -8,7 +8,7 @@ from datetime import datetime
 import pytz 
 
 # --- 🔗 LINK DA SUA PLANILHA (COLE AQUI) ---
-URL_PLANILHA = "https://docs.google.com/spreadsheets/d/SEU_ID_DA_PLANILHA_AQUI" 
+URL_PLANILHA = "https://docs.google.com/spreadsheets/d/191D0UIDvwDJPWRtp_0cBFS9rWaq6CkSj5ET_1HO2sLI/edit?usp=sharing" 
 
 # --- CONFIGURAÇÃO INICIAL ---
 st.set_page_config(page_title="Fidelidade Adega", page_icon="🍷", layout="centered")
