@@ -6,108 +6,105 @@ import urllib.parse
 import re 
 from datetime import datetime
 import pytz 
-import time 
+import time # Importante para o cronômetro
 
 # --- CONFIGURAÇÃO INICIAL ---
 st.set_page_config(page_title="Registro de Fidelidade", page_icon="🤑", layout="centered")
 
-# --- 🔒 BLOQUEIO VISUAL (AJUSTADO PARA CELULAR) ---
-# AQUI ESTAVA O PROBLEMA: Removemos o bloqueio do header para a setinha do menu aparecer
+# --- 🔒 BLOQUEIO VISUAL ---
 hide_streamlit_style = """
             <style>
-            #MainMenu {visibility: hidden;} /* Esconde os 3 pontinhos */
-            footer {visibility: hidden;}    /* Esconde o rodapé */
-            
-            /* Animação do Brinde */
-            @keyframes bounce {
-                0% { transform: scale(1); }
-                50% { transform: scale(1.2); }
-                100% { transform: scale(1); }
-            }
-            .brinde {
-                font-size: 80px;
-                animation: bounce 1s infinite;
-                text-align: center;
-                display: block;
-            }
+            #MainMenu {visibility: hidden;}
+            footer {visibility: hidden;}
+            header {visibility: hidden;}
+            .stAppHeader {display: none;}
             </style>
             """
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 
 # ==========================================
-# 🔐 SISTEMA DE LOGIN (ESTÁVEL)
+# 🔐 SISTEMA DE LOGIN COM TIMER (30 MIN)
 # ==========================================
-SENHA_DO_SISTEMA = "adega123"  
-TEMPO_LIMITE_MINUTOS = 30
+SENHA_DO_SISTEMA = "adega123"  # Sua senha
+TEMPO_LIMITE_MINUTOS = 30      # Tempo para deslogar
 
-# Inicializa variáveis
-if 'logado' not in st.session_state: st.session_state.logado = False
-if 'validando' not in st.session_state: st.session_state.validando = False
-if 'ultima_atividade' not in st.session_state: st.session_state.ultima_atividade = time.time()
+# Inicializa variáveis de sessão
+if 'logado' not in st.session_state:
+    st.session_state.logado = False
+if 'ultima_atividade' not in st.session_state:
+    st.session_state.ultima_atividade = time.time()
 
 def verificar_sessao():
-    """Verifica inatividade"""
+    """Verifica se já passou 30 minutos desde o último clique"""
     if st.session_state.logado:
         agora = time.time()
         tempo_passado = agora - st.session_state.ultima_atividade
+        # Se passou de 30 minutos (30 * 60 segundos)
         if tempo_passado > (TEMPO_LIMITE_MINUTOS * 60):
             st.session_state.logado = False
-            st.error("⏳ Sessão expirada. Entre novamente.")
+            st.error("⏳ Sua sessão expirou por inatividade. Faça login novamente.")
             return False
-        st.session_state.ultima_atividade = agora
-        return True
+        else:
+            # Se ainda está no tempo, RENOVA o tempo
+            st.session_state.ultima_atividade = agora
+            return True
     return False
 
-# --- LÓGICA DO LOGIN ---
+# --- TELA DE LOGIN ---
 if not st.session_state.logado:
-    if st.session_state.validando:
-        st.markdown("<br><br><br>", unsafe_allow_html=True)
-        st.markdown('<div class="brinde">🍻</div>', unsafe_allow_html=True)
-        st.markdown("<h3 style='text-align: center;'>Abrindo a Adega...</h3>", unsafe_allow_html=True)
-        time.sleep(2.5)
-        st.session_state.logado = True
-        st.session_state.validando = False
-        st.session_state.ultima_atividade = time.time()
-        st.rerun()
-    else:
-        st.title("🔒 Adega do Barão")
-        st.markdown("Acesso Restrito ao Sistema")
-        with st.form("login_form"):
-            senha_digitada = st.text_input("Digite a senha:", type="password")
-            entrar_btn = st.form_submit_button("ENTRAR", type="primary")
-            if entrar_btn:
-                if senha_digitada == SENHA_DO_SISTEMA:
-                    st.session_state.validando = True
-                    st.rerun()
-                else:
-                    st.error("❌ Senha incorreta!")
-        st.stop()
+    st.title("🔒 Adega do Barão")
+    st.markdown("Acesso Restrito ao Sistema")
+    
+    with st.form("login_form"):
+        senha_digitada = st.text_input("Digite a senha:", type="password")
+        entrar_btn = st.form_submit_button("ENTRAR", type="primary")
+        
+        if entrar_btn:
+            if senha_digitada == SENHA_DO_SISTEMA:
+                st.session_state.logado = True
+                st.session_state.ultima_atividade = time.time() # Marca a hora que entrou
+                st.rerun()
+            else:
+                st.error("❌ Senha incorreta!")
+    
+    st.stop() # Para o código aqui se não tiver logado
 
+# --- VERIFICAÇÃO DE TEMPO ---
+# Se estiver logado, mas o tempo estourou, ele bloqueia aqui
 if not verificar_sessao():
     st.stop()
 
 # ==========================================
-# 🍻 O SISTEMA COMEÇA AQUI
+# 🍻 O SISTEMA COMEÇA AQUI (APÓS LOGIN E TIMER)
 # ==========================================
 
-# CABEÇALHO COM BOTÃO DE SAIR (FÁCIL ACESSO NO CELULAR)
-col_tit, col_sair = st.columns([0.8, 0.2])
-with col_tit:
-    st.title("🍻 Adega do Barão")
-with col_sair:
-    st.markdown("<br>", unsafe_allow_html=True) # Espaço para alinhar
-    if st.button("Sair", type="secondary"):
-        st.session_state.logado = False
-        st.rerun()
+st.title("🍻 Adega do Barão")
 
 # --- 🔗 LINK DA SUA PLANILHA ---
 URL_PLANILHA = "https://docs.google.com/spreadsheets/d/191D0UIDvwDJPWRtp_0cBFS9rWaq6CkSj5ET_1HO2sLI/edit?usp=sharing" 
+
+# --- BARRA LATERAL ---
+with st.sidebar:
+    st.header("⚙️ Menu Admin")
+    if "docs.google.com" in URL_PLANILHA:
+        st.link_button("📂 Abrir Planilha", URL_PLANILHA)
+    
+    st.markdown("---")
+    # Botão de Sair Manual
+    if st.button("🔒 Sair Agora"):
+        st.session_state.logado = False
+        st.rerun()
+    
+    # Mostra tempo restante (opcional, só para controle)
+    st.caption(f"Sessão expira em {TEMPO_LIMITE_MINUTOS} min de inatividade.")
 
 # --- CONEXÃO COM O GOOGLE SHEETS ---
 try:
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
     creds = ServiceAccountCredentials.from_json_keyfile_dict(st.secrets["gcp_service_account"], scope)
     client = gspread.authorize(creds)
+    
+    # ABAS
     sheet_resumo = client.open("Fidelidade").worksheet("Página1") 
     try:
         sheet_historico = client.open("Fidelidade").worksheet("Historico")
@@ -288,3 +285,106 @@ if st.session_state.confirmacao:
                 st.rerun()
 
     with col2:
+        if st.button("❌ Cancelar"):
+            st.session_state.confirmacao = False
+            st.rerun()
+
+# --- SUCESSO ---
+if st.session_state.sucesso_msg:
+    resultado = st.session_state.sucesso_msg
+    st.divider()
+    st.success(resultado['texto'])
+    
+    if resultado.get('salao_festa'):
+        st.balloons()
+
+    st.markdown(f"""
+    <a href="{resultado['link']}" target="_blank" style="text-decoration: none;">
+        <div style="
+            background-color: #25D366; color: white; padding: 15px; border-radius: 10px;
+            text-align: center; font-weight: bold; font-size: 18px; margin-top: 20px;
+            box-shadow: 0px 4px 6px rgba(0,0,0,0.2); display: block; width: 100%;">
+            {resultado['btn_label']}
+        </div>
+    </a>
+    """, unsafe_allow_html=True)
+    
+    if st.button("🔄 Novo Atendimento"):
+        st.session_state.sucesso_msg = None
+        st.rerun()
+
+# ==========================================
+# 🛠️ GESTÃO DE CLIENTES
+# ==========================================
+st.markdown("---")
+st.subheader("🛠️ Gerenciar Clientes")
+
+if not df.empty and conexao:
+    df['rotulo'] = df['nome'] + " - " + df['telefone'].astype(str)
+    lista_clientes = df['rotulo'].tolist()
+    
+    col_busca, col_nada = st.columns([0.8, 0.2])
+    with col_busca:
+        cliente_selecionado = st.selectbox("Editar Cliente:", [""] + lista_clientes)
+
+    if cliente_selecionado:
+        idx = df[df['rotulo'] == cliente_selecionado].index[0]
+        dados_cli = df.iloc[idx]
+        linha_sheet = int(idx) + 2 
+        
+        st.info(f"Editando: **{dados_cli['nome']}**")
+        
+        with st.form("form_edicao"):
+            novo_nome_edit = st.text_input("Nome", value=dados_cli['nome'])
+            novo_tel_edit = st.text_input("Telefone", value=dados_cli['telefone'])
+            novos_pontos_edit = st.number_input("Pontos", min_value=0, value=int(dados_cli['compras']))
+            
+            c1, c2 = st.columns(2)
+            salvar = c1.form_submit_button("💾 Salvar")
+            excluir = c2.form_submit_button("🗑️ EXCLUIR", type="primary")
+
+        if salvar:
+            sheet_resumo.update_cell(linha_sheet, 1, novo_nome_edit.upper())
+            sheet_resumo.update_cell(linha_sheet, 2, novo_tel_edit)
+            sheet_resumo.update_cell(linha_sheet, 3, novos_pontos_edit)
+            registrar_historico(novo_nome_edit, novo_tel_edit, "Manual: Edição de dados")
+            st.success("Salvo!")
+            st.rerun()
+
+        if excluir:
+            st.session_state.id_exclusao = linha_sheet
+            st.session_state.nome_exclusao = dados_cli['nome']
+            st.rerun()
+
+    if 'id_exclusao' in st.session_state and st.session_state.id_exclusao:
+        st.error(f"⚠️ Excluir **{st.session_state.nome_exclusao}**?")
+        c1, c2 = st.columns(2)
+        if c1.button("Sim, Excluir"):
+            sheet_resumo.delete_rows(st.session_state.id_exclusao)
+            registrar_historico(st.session_state.nome_exclusao, "---", "CLIENTE EXCLUÍDO")
+            del st.session_state.id_exclusao
+            st.rerun()
+        if c2.button("Cancelar"):
+            del st.session_state.id_exclusao
+            st.rerun()
+
+# ==========================================
+# 🔎 CONSULTAR HISTÓRICO
+# ==========================================
+st.markdown("---")
+st.subheader("🔎 Histórico")
+busca_tel_input = st.text_input("Buscar Telefone", placeholder="Ex: 88999...")
+busca_tel = limpar_telefone("55" + busca_tel_input)
+
+if st.button("Buscar"):
+    if len(busca_tel) > 5:
+        try:
+            dados_hist = sheet_historico.get_all_records()
+            df_hist = pd.DataFrame(dados_hist)
+            df_hist['Telefone'] = df_hist['Telefone'].astype(str)
+            res = df_hist[df_hist['Telefone'].str.contains(busca_tel_input)]
+            if not res.empty:
+                st.dataframe(res[['Data', 'Ação']], use_container_width=True)
+            else:
+                st.warning("Nada encontrado.")
+        except: pass
