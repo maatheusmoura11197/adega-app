@@ -11,13 +11,13 @@ import time
 # --- CONFIGURAÇÃO INICIAL ---
 st.set_page_config(page_title="Registro de Fidelidade", page_icon="🤑", layout="centered")
 
-# --- 🔒 BLOQUEIO VISUAL ---
+# --- 🔒 BLOQUEIO VISUAL (REMOVE MENU, GITHUB, ETC) ---
 hide_streamlit_style = """
             <style>
-            #MainMenu {visibility: hidden;}
-            footer {visibility: hidden;}
-            header {visibility: hidden;}
-            .stAppHeader {display: none;}
+            #MainMenu {visibility: hidden;} 
+            footer {visibility: hidden;} 
+            header {visibility: hidden;} 
+            .stAppHeader {display: none;} 
             
             /* Animação do Brinde */
             @keyframes bounce {
@@ -38,7 +38,7 @@ st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 # ==========================================
 # 🔐 SISTEMA DE LOGIN (ESTÁVEL)
 # ==========================================
-SENHA_DO_SISTEMA = "adega123"  # <--- SUA SENHA
+SENHA_DO_SISTEMA = "adega123"  # <--- SUA SENHA AQUI
 TEMPO_LIMITE_MINUTOS = 30
 
 # Inicializa variáveis
@@ -61,42 +61,31 @@ def verificar_sessao():
 
 # --- LÓGICA DO LOGIN ---
 if not st.session_state.logado:
-    
-    # 1. SE ESTIVER NA FASE DE ANIMAÇÃO (VALIDANDO)
     if st.session_state.validando:
+        # TELA DE CARREGAMENTO (ANIMAÇÃO)
         st.markdown("<br><br><br>", unsafe_allow_html=True)
         st.markdown('<div class="brinde">🍻</div>', unsafe_allow_html=True)
         st.markdown("<h3 style='text-align: center;'>Abrindo a Adega...</h3>", unsafe_allow_html=True)
-        
-        # O tempo de espera acontece aqui, com a animação JÁ na tela
-        time.sleep(2.5)
-        
-        # Agora libera o acesso
+        time.sleep(2.5) # Espera a animação
         st.session_state.logado = True
         st.session_state.validando = False
         st.session_state.ultima_atividade = time.time()
         st.rerun()
-        
-    # 2. SE ESTIVER NA TELA DE SENHA NORMAL
     else:
+        # TELA DE SENHA
         st.title("🔒 Adega do Barão")
         st.markdown("Acesso Restrito ao Sistema")
-        
         with st.form("login_form"):
             senha_digitada = st.text_input("Digite a senha:", type="password")
             entrar_btn = st.form_submit_button("ENTRAR", type="primary")
-            
             if entrar_btn:
                 if senha_digitada == SENHA_DO_SISTEMA:
-                    # Ativa o modo de validação e recarrega para mostrar a animação
                     st.session_state.validando = True
                     st.rerun()
                 else:
                     st.error("❌ Senha incorreta!")
-        
-        st.stop() # Para aqui se não estiver logado
+        st.stop()
 
-# Verifica o tempo (se já estiver logado)
 if not verificar_sessao():
     st.stop()
 
@@ -104,31 +93,24 @@ if not verificar_sessao():
 # 🍻 O SISTEMA COMEÇA AQUI
 # ==========================================
 
-st.title("🍻 Adega do Barão")
+# CABEÇALHO COM BOTÃO DE SAIR
+col_tit, col_sair = st.columns([0.8, 0.2])
+with col_tit:
+    st.title("🍻 Adega do Barão")
+with col_sair:
+    st.markdown("<br>", unsafe_allow_html=True) 
+    if st.button("Sair", type="secondary"):
+        st.session_state.logado = False
+        st.rerun()
 
 # --- 🔗 LINK DA SUA PLANILHA ---
 URL_PLANILHA = "https://docs.google.com/spreadsheets/d/191D0UIDvwDJPWRtp_0cBFS9rWaq6CkSj5ET_1HO2sLI/edit?usp=sharing" 
-
-# --- BARRA LATERAL ---
-with st.sidebar:
-    st.header("⚙️ Menu Admin")
-    if "docs.google.com" in URL_PLANILHA:
-        st.link_button("📂 Abrir Planilha", URL_PLANILHA)
-    
-    st.markdown("---")
-    if st.button("🔒 Sair Agora"):
-        st.session_state.logado = False
-        st.rerun()
-    
-    st.caption(f"Sessão: {TEMPO_LIMITE_MINUTOS} min.")
 
 # --- CONEXÃO COM O GOOGLE SHEETS ---
 try:
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
     creds = ServiceAccountCredentials.from_json_keyfile_dict(st.secrets["gcp_service_account"], scope)
     client = gspread.authorize(creds)
-    
-    # ABAS
     sheet_resumo = client.open("Fidelidade").worksheet("Página1") 
     try:
         sheet_historico = client.open("Fidelidade").worksheet("Historico")
@@ -276,12 +258,13 @@ if st.session_state.confirmacao:
     st.write(f"Nome Atual: **{dados['nome_antigo']}**")
     st.info("Deseja atualizar e somar a compra?")
     
-    col1, col2 = st.columns(2)
+    # AQUI FOI CORRIGIDO O INDENTATION ERROR
+    c1, c2 = st.columns(2)
     
-    with col1:
+    with c1:
         if st.button("✅ SIM, Atualizar"):
             with st.spinner('Gravando...'):
-                linha_real = dados['indice'] + 2
+                linha_real = int(dados['indice']) + 2
                 novo_total = int(dados['compras_atuais']) + 1
                 data_hoje = pegar_data_hora()
                 
@@ -308,7 +291,7 @@ if st.session_state.confirmacao:
                 st.session_state.confirmacao = False
                 st.rerun()
 
-    with col2:
+    with c2:
         if st.button("❌ Cancelar"):
             st.session_state.confirmacao = False
             st.rerun()
@@ -338,64 +321,67 @@ if st.session_state.sucesso_msg:
         st.rerun()
 
 # ==========================================
-# 🛠️ GESTÃO DE CLIENTES
+# 🛠️ GESTÃO & ADMIN (FIM DA PÁGINA)
 # ==========================================
 st.markdown("---")
-st.subheader("🛠️ Gerenciar Clientes")
-
-if not df.empty and conexao:
-    df['rotulo'] = df['nome'] + " - " + df['telefone'].astype(str)
-    lista_clientes = df['rotulo'].tolist()
+with st.expander("⚙️ Painel Administrativo (Editar, Excluir, Planilha)"):
     
-    col_busca, col_nada = st.columns([0.8, 0.2])
-    with col_busca:
-        cliente_selecionado = st.selectbox("Editar Cliente:", [""] + lista_clientes)
+    if "docs.google.com" in URL_PLANILHA:
+        st.link_button("📂 Abrir Planilha no Google", URL_PLANILHA)
+    
+    st.markdown("### Gerenciar Clientes")
+    if not df.empty and conexao:
+        df['rotulo'] = df['nome'] + " - " + df['telefone'].astype(str)
+        lista_clientes = df['rotulo'].tolist()
+        
+        cliente_selecionado = st.selectbox("Selecione para Editar:", [""] + lista_clientes)
 
-    if cliente_selecionado:
-        idx = df[df['rotulo'] == cliente_selecionado].index[0]
-        dados_cli = df.iloc[idx]
-        linha_sheet = int(idx) + 2 
-        
-        st.info(f"Editando: **{dados_cli['nome']}**")
-        
-        with st.form("form_edicao"):
-            novo_nome_edit = st.text_input("Nome", value=dados_cli['nome'])
-            novo_tel_edit = st.text_input("Telefone", value=dados_cli['telefone'])
-            novos_pontos_edit = st.number_input("Pontos", min_value=0, value=int(dados_cli['compras']))
+        if cliente_selecionado:
+            idx = df[df['rotulo'] == cliente_selecionado].index[0]
+            dados_cli = df.iloc[idx]
+            linha_sheet = int(idx) + 2 
             
-            c1, c2 = st.columns(2)
-            salvar = c1.form_submit_button("💾 Salvar")
-            excluir = c2.form_submit_button("🗑️ EXCLUIR", type="primary")
+            with st.form("form_edicao"):
+                st.write(f"Editando: **{dados_cli['nome']}**")
+                novo_nome_edit = st.text_input("Nome", value=dados_cli['nome'])
+                novo_tel_edit = st.text_input("Telefone", value=dados_cli['telefone'])
+                novos_pontos_edit = st.number_input("Pontos", min_value=0, value=int(dados_cli['compras']))
+                
+                c1, c2 = st.columns(2)
+                salvar = c1.form_submit_button("💾 Salvar")
+                excluir = c2.form_submit_button("🗑️ EXCLUIR", type="primary")
 
-        if salvar:
-            sheet_resumo.update_cell(linha_sheet, 1, novo_nome_edit.upper())
-            sheet_resumo.update_cell(linha_sheet, 2, novo_tel_edit)
-            sheet_resumo.update_cell(linha_sheet, 3, novos_pontos_edit)
-            registrar_historico(novo_nome_edit, novo_tel_edit, "Manual: Edição de dados")
-            st.success("Salvo!")
-            st.rerun()
+            if salvar:
+                sheet_resumo.update_cell(linha_sheet, 1, novo_nome_edit.upper())
+                sheet_resumo.update_cell(linha_sheet, 2, novo_tel_edit)
+                sheet_resumo.update_cell(linha_sheet, 3, novos_pontos_edit)
+                registrar_historico(novo_nome_edit, novo_tel_edit, "Manual: Edição de dados")
+                st.success("Salvo!")
+                st.rerun()
 
-        if excluir:
-            st.session_state.id_exclusao = linha_sheet
-            st.session_state.nome_exclusao = dados_cli['nome']
-            st.rerun()
+            if excluir:
+                st.session_state.id_exclusao = linha_sheet
+                st.session_state.nome_exclusao = dados_cli['nome']
+                st.rerun()
 
-    if 'id_exclusao' in st.session_state and st.session_state.id_exclusao:
-        st.error(f"⚠️ Excluir **{st.session_state.nome_exclusao}**?")
-        c1, c2 = st.columns(2)
-        if c1.button("Sim, Excluir"):
-            sheet_resumo.delete_rows(st.session_state.id_exclusao)
-            registrar_historico(st.session_state.nome_exclusao, "---", "CLIENTE EXCLUÍDO")
-            del st.session_state.id_exclusao
-            st.rerun()
-        if c2.button("Cancelar"):
-            del st.session_state.id_exclusao
-            st.rerun()
+        if 'id_exclusao' in st.session_state and st.session_state.id_exclusao:
+            st.error(f"⚠️ Excluir **{st.session_state.nome_exclusao}**?")
+            # CORRIGIDO: BOTOES DELETAR DENTRO DE COLUNAS COM WITH
+            cx1, cx2 = st.columns(2)
+            with cx1:
+                if st.button("Sim, Excluir"):
+                    sheet_resumo.delete_rows(st.session_state.id_exclusao)
+                    registrar_historico(st.session_state.nome_exclusao, "---", "CLIENTE EXCLUÍDO")
+                    del st.session_state.id_exclusao
+                    st.rerun()
+            with cx2:
+                if st.button("Cancelar"):
+                    del st.session_state.id_exclusao
+                    st.rerun()
 
 # ==========================================
 # 🔎 CONSULTAR HISTÓRICO
 # ==========================================
-st.markdown("---")
 st.subheader("🔎 Histórico")
 busca_tel_input = st.text_input("Buscar Telefone", placeholder="Ex: 88999...")
 busca_tel = limpar_telefone("55" + busca_tel_input)
