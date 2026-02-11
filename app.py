@@ -10,7 +10,7 @@ import time
 # ==========================================
 # ⚙️ CONFIGURAÇÃO E ESTILO
 # ==========================================
-st.set_page_config(page_title="Adega do Barão v24", page_icon="🍷", layout="wide")
+st.set_page_config(page_title="Adega do Barão", page_icon="🍺", layout="wide")
 
 st.markdown("""
     <style>
