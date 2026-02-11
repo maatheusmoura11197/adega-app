@@ -11,41 +11,86 @@ import time
 # ==========================================
 # ⚙️ CONFIGURAÇÃO INICIAL
 # ==========================================
-st.set_page_config(page_title="Adega App v13", page_icon="🍷", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(
+    page_title="Super Adega 12.0",
+    page_icon="🍷",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 
+# --- VISUAL ---
 hide_streamlit_style = """
             <style>
             #MainMenu {visibility: visible;} 
             footer {visibility: hidden;} 
-            .stSelectbox div[data-baseweb="select"] > div:first-child { border-color: #ff4b4b; }
+            .stSelectbox div[data-baseweb="select"] > div:first-child {
+                border-color: #ff4b4b;
+            }
             .big-btn {
-                background-color: #25D366; color: white; padding: 15px; border-radius: 10px; 
-                text-align: center; font-weight: bold; font-size: 20px; margin-top: 10px;
-                text-decoration: none; display: block;
+                background-color: #25D366; 
+                color: white; 
+                padding: 15px; 
+                border-radius: 10px; 
+                text-align: center; 
+                font-weight: bold; 
+                font-size: 20px; 
+                margin-top: 10px;
+                text-decoration: none;
+                display: block;
             }
             </style>
             """
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 
 # ==========================================
-# 🔐 LOGIN (SESSÃO)
+# 🔐 LOGIN
 # ==========================================
 SENHA_DO_SISTEMA = "adega123" 
+TEMPO_LIMITE_MINUTOS = 60
+
 if 'logado' not in st.session_state: st.session_state.logado = False
+if 'validando' not in st.session_state: st.session_state.validando = False
+if 'ultima_atividade' not in st.session_state: st.session_state.ultima_atividade = time.time()
 if 'venda_sucesso' not in st.session_state: st.session_state.venda_sucesso = False
+if 'link_zap_atual' not in st.session_state: st.session_state.link_zap_atual = ""
+if 'msg_zap_btn' not in st.session_state: st.session_state.msg_zap_btn = ""
+
+def verificar_sessao():
+    if st.session_state.logado:
+        agora = time.time()
+        tempo_passado = agora - st.session_state.ultima_atividade
+        if tempo_passado > (TEMPO_LIMITE_MINUTOS * 60):
+            st.session_state.logado = False
+            return False
+        st.session_state.ultima_atividade = agora
+        return True
+    return False
 
 if not st.session_state.logado:
-    st.title("🔒 Acesso Adega")
-    senha = st.text_input("Senha:", type="password")
-    if st.button("ENTRAR"):
-        if senha == SENHA_DO_SISTEMA:
-            st.session_state.logado = True
-            st.rerun()
-    st.stop()
+    if st.session_state.validando:
+        st.write("Entrando...")
+        time.sleep(1)
+        st.session_state.logado = True
+        st.session_state.validando = False
+        st.rerun()
+    else:
+        st.title("🔒 Acesso Restrito")
+        with st.form("login_form"):
+            senha = st.text_input("Senha:", type="password")
+            if st.form_submit_button("ENTRAR", type="primary"):
+                if senha == SENHA_DO_SISTEMA:
+                    st.session_state.validando = True
+                    st.rerun()
+                else: st.error("Senha errada")
+        st.stop()
+
+if not verificar_sessao(): st.stop()
 
 # ==========================================
 # 📡 CONEXÃO GOOGLE SHEETS
 # ==========================================
+URL_PLANILHA = "https://docs.google.com/spreadsheets/d/191D0UIDvwDJPWRtp_0cBFS9rWaq6CkSj5ET_1HO2sLI/edit?usp=sharing"
+
 try:
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
     creds = ServiceAccountCredentials.from_json_keyfile_dict(st.secrets["gcp_service_account"], scope)
@@ -55,26 +100,27 @@ try:
     sheet_hist_cli = planilha.worksheet("Historico")
     sheet_estoque = planilha.worksheet("Estoque") 
     sheet_hist_est = planilha.worksheet("Historico_Estoque")
-except:
-    st.error("Erro ao conectar na Planilha.")
+except Exception as e:
+    st.error(f"Erro Conexão: {e}")
     st.stop()
 
-# --- 🧮 FUNÇÕES DE LIMPEZA ---
-def limpar_valor(valor):
-    """Limpa o valor vindo do Sheets ou do usuário para o Python entender"""
-    if not valor: return 0.0
-    v = str(valor).replace("R$", "").replace(" ", "").strip()
-    if "," in v:
-        if v.count(".") > 0: v = v.replace(".", "") # Tira milhar
-        v = v.replace(",", ".")
-    try: return float(v)
+# --- FUNÇÕES AUXILIARES ---
+def limpar_telefone(tel): return re.sub(r'\D', '', str(tel))
+def pegar_data_hora(): return datetime.now(pytz.timezone('America/Sao_Paulo')).strftime('%d/%m/%Y %H:%M')
+
+def ler_numero_input(valor):
+    if not valor or str(valor).strip() == "": return 0.0
+    val_str = str(valor).replace("R$", "").strip()
+    if "," in val_str:
+        val_str = val_str.replace(".", "").replace(",", ".")
+    try: return float(val_str)
     except: return 0.0
 
-def para_texto_br(valor):
-    """Converte o número para texto com vírgula para o Sheets não bugar"""
+def float_para_sheets(valor):
     return f"{valor:.2f}".replace(".", ",")
 
-def limpar_tel(t): return re.sub(r'\D', '', str(t))
+def formatar_moeda_visual(v):
+    return f"R$ {v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
 def gerar_mensagem_zap(nome_cliente, total_compras):
     if total_compras == 1:
@@ -95,147 +141,212 @@ def gerar_mensagem_zap(nome_cliente, total_compras):
 # 📱 MENU LATERAL
 # ==========================================
 with st.sidebar:
-    st.title("🍷 Adega Sistema")
-    menu = st.radio("Escolha:", ["💰 Caixa & Fidelidade", "📦 Estoque (Entrada/Editar)", "👥 Gerenciar Clientes", "📊 Relatórios"])
+    st.title("🍷 Menu")
+    st.link_button("📂 Abrir Planilha", URL_PLANILHA)
     st.divider()
+    menu = st.radio("Navegar:", ["💰 Fidelidade & Caixa", "📦 Gestão de Estoque", "👥 Gerenciar Clientes", "📊 Relatórios"])
+    st.markdown("---")
     if st.button("Sair"):
         st.session_state.logado = False
         st.rerun()
 
 # ==========================================
-# 📦 MÓDULO ESTOQUE (COMPLETO)
+# 📦 GESTÃO DE ESTOQUE
 # ==========================================
-if menu == "📦 Estoque (Entrada/Editar)":
-    st.title("📦 Gestão de Estoque")
-    df_est = pd.DataFrame(sheet_estoque.get_all_records())
-    tab1, tab2, tab3 = st.tabs(["📝 Registrar Compra", "✏️ Editar/Excluir", "📋 Lista Atual"])
+if menu == "📦 Gestão de Estoque":
+    st.title("📦 Controle de Estoque")
+    aba_cad, aba_edit, aba_ver = st.tabs(["📝 Entrada (Compra)", "✏️ Editar/Excluir Item", "📋 Ver Estoque"])
+    
+    try:
+        dados_raw = sheet_estoque.get_all_records()
+        df_estoque = pd.DataFrame(dados_raw)
+    except: df_estoque = pd.DataFrame()
 
-    with tab1:
-        modo = st.radio("Item:", ["Existente", "Novo"], horizontal=True)
-        if modo == "Existente" and not df_est.empty:
-            nome_sel = st.selectbox("Selecione o Produto:", df_est['Nome'].tolist())
-            ref_fardo = limpar_valor(df_est[df_est['Nome']==nome_sel].iloc[0].get('Qtd_Fardo', 12))
+    with aba_cad:
+        st.subheader("Registrar Compra")
+        lista_nomes = df_estoque['Nome'].unique().tolist() if not df_estoque.empty else []
+        modo_cadastro = st.radio("Produto:", ["Selecionar Existente", "Cadastrar Novo"], horizontal=True)
+        
+        nome_final = ""
+        qtd_fardo_ref = 12 
+        
+        if modo_cadastro == "Selecionar Existente":
+            if lista_nomes:
+                nome_sel = st.selectbox("Escolha o Item:", lista_nomes)
+                nome_final = nome_sel
+                item_dados = df_estoque[df_estoque['Nome'] == nome_sel].iloc[0]
+                # CORREÇÃO KEYERROR: Verifica se a coluna existe
+                try: qtd_fardo_ref = int(ler_numero_input(item_dados['Qtd_Fardo']))
+                except: qtd_fardo_ref = 12
+            else: st.warning("Estoque vazio.")
         else:
-            nome_sel = st.text_input("Nome:", placeholder="SKOL LATA").upper()
-            ref_fardo = st.number_input("Unidades por Fardo:", value=12)
-
-        c1, c2, c3 = st.columns(3)
-        custo_f = c1.text_input("Preço Fardo (R$):", placeholder="36,70")
-        qtd_f = c2.text_input("Qtd Fardos:", placeholder="1")
-        venda_un = c3.text_input("Venda Unitária (R$):", placeholder="4,49")
-
-        if st.button("💾 SALVAR ESTOQUE"):
-            v_custo = limpar_valor(custo_f)
-            v_qtd = limpar_valor(qtd_f)
-            v_venda = limpar_valor(venda_un)
+            nome_digitado = st.text_input("Nome do Novo Produto:", placeholder="Ex: Skol Lata").upper()
+            tipo = st.selectbox("Tipo:", ["Lata", "Long Neck", "Garrafa 600ml", "Litro/Outros"])
+            nome_final = f"{nome_digitado} ({tipo})" if nome_digitado else ""
             
-            if v_custo > 0 and v_qtd > 0:
-                custo_un_novo = v_custo / ref_fardo
-                novas_unidades = int(v_qtd * ref_fardo)
-                
-                if modo == "Existente":
-                    idx = df_est[df_est['Nome']==nome_sel].index[0]
-                    est_antigo = limpar_valor(df_est.iloc[idx]['Estoque'])
-                    custo_antigo = limpar_valor(df_est.iloc[idx]['Custo'])
-                    if custo_antigo > 1000: custo_antigo = custo_un_novo # Reseta erro de milhão
-                    
-                    novo_total = est_antigo + novas_unidades
-                    novo_custo_med = ((est_antigo * custo_antigo) + (novas_unidades * custo_un_novo)) / novo_total
-                    
-                    sheet_estoque.update_cell(idx+2, 6, int(novo_total))
-                    sheet_estoque.update_cell(idx+2, 4, para_texto_br(novo_custo_med))
-                    sheet_estoque.update_cell(idx+2, 5, para_texto_br(v_venda))
-                else:
-                    sheet_estoque.append_row([nome_sel, "Geral", "", para_texto_br(custo_un_novo), para_texto_br(v_venda), novas_unidades, date.today().strftime('%d/%m/%Y'), ref_fardo])
-                
-                st.success("Estoque Atualizado!")
-                time.sleep(1)
-                st.rerun()
+        st.divider()
+        col_forma, col_vals = st.columns([1, 2])
+        with col_forma:
+            st.write("Como comprou?")
+            forma_compra = st.radio("Formato:", ["Fardo Fechado", "Unidades Soltas"])
+            data_compra = st.date_input("Data da Compra", date.today())
+            fornecedor = st.text_input("Fornecedor", placeholder="Ex: Atacadão")
+        with col_vals:
+            custo_unitario_novo = 0.0
+            qtd_total_adicionada = 0
+            if forma_compra == "Fardo Fechado":
+                custo_fardo_str = st.text_input("Valor pago no FARDO (R$)", placeholder="Ex: 36,70")
+                qtd_dentro = st.selectbox("Quantas vêm no fardo?", list(range(1, 25)), index=11)
+                qtd_fardos_str = st.text_input("Quantos FARDOS comprou?", placeholder="Ex: 10")
+                custo_fardo = ler_numero_input(custo_fardo_str)
+                qtd_fardos_compra = ler_numero_input(qtd_fardos_str)
+                if custo_fardo > 0 and qtd_dentro > 0 and qtd_fardos_compra > 0:
+                    custo_unitario_novo = custo_fardo / qtd_dentro
+                    qtd_total_adicionada = int(qtd_fardos_compra * qtd_dentro)
+                    qtd_fardo_ref = qtd_dentro
+            else:
+                custo_unit_str = st.text_input("Valor pago na UNIDADE (R$)", placeholder="Ex: 4,50")
+                qtd_soltas_str = st.text_input("Quantas UNIDADES comprou?", placeholder="Ex: 50")
+                qtd_fardo_ref = st.selectbox("Tamanho padrão do fardo (Ref):", list(range(1, 25)), index=11)
+                custo_unit = ler_numero_input(custo_unit_str)
+                qtd_soltas = ler_numero_input(qtd_soltas_str)
+                if custo_unit > 0 and qtd_soltas > 0:
+                    custo_unitario_novo = custo_unit
+                    qtd_total_adicionada = int(qtd_soltas)
+            preco_venda_str = st.text_input("Preço de Venda Unitário (R$)", placeholder="Ex: 4,49")
+            preco_venda = ler_numero_input(preco_venda_str)
 
-    with tab2:
-        if not df_est.empty:
-            edit_nome = st.selectbox("Escolha para Editar ou Excluir:", ["Selecione..."] + df_est['Nome'].tolist())
-            if edit_nome != "Selecione...":
-                idx_e = df_est[df_est['Nome']==edit_nome].index[0]
-                row_e = df_est.iloc[idx_e]
+        if st.button("💾 Salvar Estoque", type="primary"):
+            if nome_final and qtd_total_adicionada > 0 and preco_venda > 0:
+                with st.spinner("Calculando..."):
+                    encontrado = False
+                    idx_planilha = 2
+                    if not df_estoque.empty:
+                        for i, row in df_estoque.iterrows():
+                            if row['Nome'] == nome_final:
+                                est_antigo = int(ler_numero_input(row['Estoque']))
+                                custo_antigo = ler_numero_input(row['Custo'])
+                                if custo_antigo > 1000: custo_antigo = custo_unitario_novo
+                                val_antigo = est_antigo * custo_antigo
+                                val_novo = qtd_total_adicionada * custo_unitario_novo
+                                n_total = est_antigo + qtd_total_adicionada
+                                n_custo = (val_antigo + val_novo) / n_total if n_total > 0 else custo_unitario_novo
+                                sheet_estoque.update_cell(idx_planilha + i, 6, n_total)
+                                sheet_estoque.update_cell(idx_planilha + i, 4, float_para_sheets(n_custo))
+                                sheet_estoque.update_cell(idx_planilha + i, 5, float_para_sheets(preco_venda))
+                                sheet_estoque.update_cell(idx_planilha + i, 3, fornecedor)
+                                sheet_estoque.update_cell(idx_planilha + i, 7, data_compra.strftime('%d/%m/%Y'))
+                                try: sheet_estoque.update_cell(idx_planilha + i, 8, qtd_fardo_ref)
+                                except: pass
+                                encontrado = True
+                                break
+                    if not encontrado:
+                        sheet_estoque.append_row([nome_final, "Geral", fornecedor, float_para_sheets(custo_unitario_novo), float_para_sheets(preco_venda), qtd_total_adicionada, data_compra.strftime('%d/%m/%Y'), qtd_fardo_ref])
+                    sheet_hist_est.append_row([pegar_data_hora(), nome_final, "COMPRA", qtd_total_adicionada, float_para_sheets(qtd_total_adicionada*custo_unitario_novo), f"Forn: {fornecedor}"])
+                    st.success("✅ Salvo!")
+                    time.sleep(1)
+                    st.rerun()
+
+    with aba_edit:
+        st.subheader("✏️ Editar/Excluir")
+        if not df_estoque.empty:
+            prod_edit = st.selectbox("Selecione:", ["Selecione..."] + df_estoque['Nome'].tolist())
+            if prod_edit != "Selecione...":
+                idx_edit = df_estoque[df_estoque['Nome'] == prod_edit].index[0]
+                row_edit = df_estoque.iloc[idx_edit]
+                linha_s = idx_edit + 2
                 with st.form("form_edit"):
-                    st.write(f"Editando: **{edit_nome}**")
-                    new_v = st.text_input("Preço Venda:", value=str(row_e['Venda']))
-                    new_c = st.text_input("Custo Médio:", value=str(row_e['Custo']))
-                    new_q = st.number_input("Estoque Real (Qtd):", value=int(row_e['Estoque']))
-                    
-                    c_salvar, c_excluir = st.columns(2)
-                    if c_salvar.form_submit_button("💾 Salvar"):
-                        sheet_estoque.update_cell(idx_e+2, 5, new_v)
-                        sheet_estoque.update_cell(idx_e+2, 4, new_c)
-                        sheet_estoque.update_cell(idx_e+2, 6, int(new_q))
+                    st.info(f"Editando: {prod_edit}")
+                    c1, c2, c3 = st.columns(3)
+                    n_v = c1.text_input("Venda (R$)", value=float_para_sheets(ler_numero_input(row_edit['Venda'])))
+                    n_c = c2.text_input("Custo (R$)", value=float_para_sheets(ler_numero_input(row_edit['Custo'])))
+                    n_e = c3.number_input("Estoque", value=int(ler_numero_input(row_edit['Estoque'])), step=1)
+                    c_s, c_d = st.columns(2)
+                    if c_s.form_submit_button("💾 Salvar"):
+                        sheet_estoque.update_cell(linha_s, 5, n_v)
+                        sheet_estoque.update_cell(linha_s, 4, n_c)
+                        sheet_estoque.update_cell(linha_s, 6, n_e)
                         st.success("Atualizado!")
                         st.rerun()
-                    if c_excluir.form_submit_button("🗑️ EXCLUIR ITEM"):
-                        sheet_estoque.delete_rows(int(idx_e+2))
+                    if c_d.form_submit_button("🗑️ EXCLUIR"):
+                        sheet_estoque.delete_rows(int(linha_s))
                         st.rerun()
 
-    with tab3:
-        if not df_est.empty:
-            df_v = df_est.copy()
-            df_v['Custo'] = df_v['Custo'].apply(limpar_valor)
-            df_v['Venda'] = df_v['Venda'].apply(limpar_valor)
-            df_v['Lucro'] = df_v['Venda'] - df_v['Custo']
-            st.dataframe(df_v[['Nome', 'Estoque', 'Venda', 'Custo', 'Lucro']], use_container_width=True)
+    with aba_ver:
+        if not df_estoque.empty:
+            df_display = df_estoque.copy()
+            df_display['Custo_N'] = df_display['Custo'].apply(ler_numero_input)
+            df_display['Venda_N'] = df_display['Venda'].apply(ler_numero_input)
+            df_display['Lucro Real'] = df_display['Venda_N'] - df_display['Custo_N']
+            st.dataframe(df_display[['Nome', 'Estoque', 'Venda', 'Custo', 'Lucro Real']], use_container_width=True)
 
 # ==========================================
-# 💰 CAIXA & FIDELIDADE
+# 💰 FIDELIDADE & CAIXA
 # ==========================================
-elif menu == "💰 Caixa & Fidelidade":
+elif menu == "💰 Fidelidade & Caixa":
+    st.title("💰 Caixa & Fidelidade")
     if st.session_state.venda_sucesso:
-        st.success("✅ Venda Registrada!")
-        st.markdown(f'<a href="{st.session_state.link_zap}" target="_blank" class="big-btn">{st.session_state.txt_btn}</a>', unsafe_allow_html=True)
-        if st.button("Nova Venda"):
-            st.session_state.venda_sucesso = False
-            st.rerun()
+        st.success("✅ Sucesso!")
+        st.markdown(f"""<a href="{st.session_state.link_zap_atual}" target="_blank" class="big-btn">📱 {st.session_state.msg_zap_btn}</a>""", unsafe_allow_html=True)
+        if st.button("Nova Venda"): st.session_state.venda_sucesso = False; st.rerun()
     else:
-        df_cli = pd.DataFrame(sheet_clientes.get_all_records())
-        df_est = pd.DataFrame(sheet_estoque.get_all_records())
-        
-        sel_cli = st.selectbox("Cliente:", ["🆕 NOVO"] + (df_cli['nome'] + " - " + df_cli['telefone'].astype(str)).tolist())
-        c_n, c_t = st.columns(2)
-        if sel_cli == "🆕 NOVO":
-            nome_c = c_n.text_input("Nome:").upper()
-            tel_c = c_t.text_input("Tel:")
+        df_clientes = pd.DataFrame(sheet_clientes.get_all_records())
+        df_estoque = pd.DataFrame(sheet_estoque.get_all_records())
+        st.markdown("### 👤 Cliente")
+        lista_c = ["🆕 NOVO CLIENTE"] + (df_clientes['nome'] + " - " + df_clientes['telefone'].astype(str)).tolist() if not df_clientes.empty else ["🆕 NOVO CLIENTE"]
+        sel_c = st.selectbox("Selecione:", lista_c)
+        c1, c2 = st.columns(2)
+        if sel_c == "🆕 NOVO CLIENTE":
+            n_i = c1.text_input("Nome:").strip().upper()
+            t_i = c2.text_input("Tel:")
         else:
-            nome_c = sel_cli.split(" - ")[0]
-            tel_c = sel_cli.split(" - ")[1]
-        
+            n_i = sel_c.split(" - ")[0]
+            t_i = sel_c.split(" - ")[1]
+        t_limpo = limpar_telefone(t_i)
         st.divider()
-        prod_sel = st.selectbox("Produto:", ["(Apenas Ponto)"] + df_est['Nome'].tolist())
-        q_f, q_u = st.columns(2)
-        v_f = q_f.number_input("Fardos:", min_value=0, step=1)
-        v_u = q_u.number_input("Unidades:", min_value=0, step=1)
-
-        if st.button("✅ CONFIRMAR"):
-            t_l = limpar_tel(tel_c)
-            # Baixa estoque
-            if prod_sel != "(Apenas Ponto)":
-                row_p = df_est[df_est['Nome']==prod_sel].iloc[0]
-                total_b = (v_f * int(row_p['Qtd_Fardo'])) + v_u
-                sheet_estoque.update_cell(int(df_est[df_est['Nome']==prod_sel].index[0]+2), 6, int(row_p['Estoque']) - total_b)
+        st.markdown("### 🛒 Carrinho")
+        if not df_estoque.empty:
+            df_estoque['Menu'] = df_estoque.apply(lambda x: f"{x['Nome']} (Estoque: {x['Estoque']})", axis=1)
+            prod_sel = st.selectbox("Produto:", ["(Apenas Ponto)"] + df_estoque['Menu'].tolist())
+            nome_p_real = prod_sel.split(" (Estoque:")[0] if prod_sel != "(Apenas Ponto)" else "(Apenas Ponto)"
+            c_f, c_u = st.columns(2)
+            v_f = c_f.selectbox("FARDOS", list(range(0, 11)))
+            v_u = c_u.selectbox("UNIDADES", list(range(0, 41)))
             
-            # Fidelidade
-            df_cli['t_str'] = df_cli['telefone'].astype(str).apply(limpar_tel)
-            match = df_cli[df_cli['t_str'] == t_l]
-            if not match.empty:
-                idx_c = match.index[0]
-                novos_pts = int(match.iloc[0]['compras']) + 1
-                sheet_clientes.update_cell(int(idx_c+2), 3, novos_pts)
-            else:
-                novos_pts = 1
-                sheet_clientes.append_row([nome_c, t_l, 1, date.today().strftime('%d/%m/%Y')])
-            
-            msg, b_t = gerar_mensagem_zap(nome_c, novos_pts)
-            st.session_state.link_zap = f"https://api.whatsapp.com/send?phone=55{t_l}&text={urllib.parse.quote(msg)}"
-            st.session_state.txt_btn = b_t
-            st.session_state.venda_sucesso = True
-            st.rerun()
+            if st.button("✅ CONFIRMAR VENDA", type="primary"):
+                if n_i:
+                    with st.spinner("Registrando..."):
+                        if nome_p_real != "(Apenas Ponto)":
+                            idx_e = df_estoque[df_estoque['Nome'] == nome_p_real].index[0]
+                            row_p = df_estoque.iloc[idx_e]
+                            # CORREÇÃO KEYERROR: Fallback caso Qtd_Fardo não exista
+                            try: ref_f = int(ler_numero_input(row_p['Qtd_Fardo']))
+                            except: ref_f = 12
+                            
+                            total_b = (v_f * ref_f) + v_u
+                            est_at = int(ler_numero_input(row_p['Estoque']))
+                            if est_at >= total_b:
+                                sheet_estoque.update_cell(idx_e + 2, 6, est_at - total_b)
+                                total_mon = total_b * ler_numero_input(row_p['Venda'])
+                                sheet_hist_est.append_row([pegar_data_hora(), nome_p_real, "VENDA", total_b, float_para_sheets(total_mon), f"Cli: {n_i}"])
+                            else: st.error("Sem estoque!"); st.stop()
+                        
+                        # FIDELIDADE (Evita duplicar)
+                        df_clientes['tel_l'] = df_clientes['telefone'].apply(limpar_telefone)
+                        match = df_clientes[df_clientes['tel_l'] == t_limpo]
+                        if not match.empty:
+                            pts = int(ler_numero_input(match.iloc[0]['compras'])) + 1
+                            sheet_clientes.update_cell(int(match.index[0] + 2), 3, pts)
+                        else:
+                            pts = 1
+                            sheet_clientes.append_row([n_i, t_i, 1, date.today().strftime('%d/%m/%Y')])
+                        
+                        msg, btn = gerar_mensagem_zap(n_i, pts)
+                        st.session_state.link_zap_atual = f"https://api.whatsapp.com/send?phone=55{t_limpo}&text={urllib.parse.quote(msg)}"
+                        st.session_state.msg_zap_btn = btn
+                        st.session_state.venda_sucesso = True
+                        st.rerun()
+        else: st.warning("Estoque vazio.")
 
 # ==========================================
 # 👥 GERENCIAR CLIENTES
@@ -245,30 +356,31 @@ elif menu == "👥 Gerenciar Clientes":
     df_c = pd.DataFrame(sheet_clientes.get_all_records())
     if not df_c.empty:
         df_c['Display'] = df_c['nome'] + " - " + df_c['telefone'].astype(str)
-        sel = st.selectbox("Selecione:", df_c['Display'].tolist())
-        idx = df_c[df_c['Display']==sel].index[0]
-        row = df_c.iloc[idx]
-        
-        with st.form("edit_cli"):
-            n_n = st.text_input("Nome:", value=row['nome'])
-            n_t = st.text_input("Telefone:", value=str(row['telefone']))
-            n_p = st.number_input("Pontos:", value=int(row['compras']))
-            if st.form_submit_button("Salvar Alterações"):
-                sheet_clientes.update_cell(idx+2, 1, n_n)
-                sheet_clientes.update_cell(idx+2, 2, n_t)
-                sheet_clientes.update_cell(idx+2, 3, n_p)
-                st.success("Salvo!")
-                st.rerun()
-            if st.form_submit_button("🗑️ EXCLUIR CLIENTE"):
-                sheet_clientes.delete_rows(int(idx+2))
-                st.rerun()
+        sel = st.selectbox("Escolha:", ["Selecione..."] + df_c['Display'].tolist())
+        if sel != "Selecione...":
+            idx = df_c[df_c['Display'] == sel].index[0]
+            linha_s = idx + 2
+            with st.form("form_edit_cli"):
+                n_n = st.text_input("Nome", value=df_c.iloc[idx]['nome'])
+                n_t = st.text_input("Tel", value=df_c.iloc[idx]['telefone'])
+                n_p = st.number_input("Pontos", value=int(ler_numero_input(df_c.iloc[idx]['compras'])))
+                if st.form_submit_button("Salvar"):
+                    sheet_clientes.update_cell(linha_s, 1, n_n)
+                    sheet_clientes.update_cell(linha_s, 2, n_t)
+                    sheet_clientes.update_cell(linha_s, 3, n_p)
+                    st.rerun()
+                if st.form_submit_button("🗑️ EXCLUIR CLIENTE"):
+                    sheet_clientes.delete_rows(int(linha_s))
+                    st.rerun()
 
 # ==========================================
 # 📊 RELATÓRIOS
 # ==========================================
 elif menu == "📊 Relatórios":
     st.title("📊 Relatórios")
-    st.subheader("Vendas (Estoque)")
-    st.dataframe(pd.DataFrame(sheet_hist_est.get_all_records()), use_container_width=True)
-    st.subheader("Visitas (Fidelidade)")
-    st.dataframe(pd.DataFrame(sheet_hist_cli.get_all_records()), use_container_width=True)
+    st.write("Estoque")
+    try: st.dataframe(pd.DataFrame(sheet_hist_est.get_all_records()), use_container_width=True)
+    except: st.write("Vazio")
+    st.write("Fidelidade")
+    try: st.dataframe(pd.DataFrame(sheet_hist_cli.get_all_records()), use_container_width=True)
+    except: st.write("Vazio")
