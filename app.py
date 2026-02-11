@@ -60,41 +60,69 @@ if not st.session_state.logado:
     st.stop()
 
 # ==========================================
-# 📡 CONEXÃO E AUTO-REPARO (A VACINA)
+# 📡 CONEXÃO OTIMIZADA (COM CACHE)
 # ==========================================
 try:
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
     creds = ServiceAccountCredentials.from_json_keyfile_dict(st.secrets["gcp_service_account"], scope)
     client = gspread.authorize(creds)
     planilha = client.open("Fidelidade")
+    
+    # Define as planilhas
     sheet_clientes = planilha.worksheet("Página1") 
     sheet_estoque = planilha.worksheet("Estoque") 
     sheet_hist_est = planilha.worksheet("Historico_Estoque")
     sheet_hist_cli = planilha.worksheet("Historico")
 
-    # --- FUNÇÃO DE AUTO-REPARO DE CABEÇALHOS ---
-    # Verifica se a linha 1 tem todos os nomes necessários. Se não tiver, ele escreve.
-    # Isso evita o APIError.
+    # --- FUNÇÃO DE AUTO-REPARO ---
     def garantir_cabecalhos():
         headers_padrao = ["Nome", "Tipo", "Fornecedor", "Custo", "Venda", "Estoque", "Data Compra", "Qtd_Fardo", "ML"]
         try:
             atuais = sheet_estoque.row_values(1)
-            # Se estiver vazia ou faltando colunas (menos que 9), reescreve o cabeçalho
             if not atuais or len(atuais) < 9:
-                # Atualiza célula por célula para garantir compatibilidade
                 for i, h in enumerate(headers_padrao):
                     sheet_estoque.update_cell(1, i+1, h)
-        except:
-            pass # Se der erro na verificação, segue o jogo
-            
-    garantir_cabecalhos() # Roda sempre que abrir o sistema
+        except: pass
+
+    # --- SISTEMA DE CACHE INTELIGENTE (RESOLVE O ERRO 429) ---
+    # TTL=5 significa: Lê os dados e guarda por 5 segundos. 
+    # Se você clicar 100 vezes nesse tempo, ele não incomoda o Google.
+    
+    @st.cache_data(ttl=5)
+    def carregar_dados_estoque():
+        try: return pd.DataFrame(sheet_estoque.get_all_records())
+        except: return pd.DataFrame()
+
+    @st.cache_data(ttl=5)
+    def carregar_dados_clientes():
+        try: return pd.DataFrame(sheet_clientes.get_all_records())
+        except: return pd.DataFrame()
+
+    @st.cache_data(ttl=5)
+    def carregar_historico_cli():
+        try: return pd.DataFrame(sheet_hist_cli.get_all_records())
+        except: return pd.DataFrame()
+
+    @st.cache_data(ttl=5)
+    def carregar_historico_est():
+        try: return pd.DataFrame(sheet_hist_est.get_all_records())
+        except: return pd.DataFrame()
+
+    # Função para limpar o cache quando salvamos algo novo (para atualizar na hora)
+    def limpar_cache():
+        carregar_dados_estoque.clear()
+        carregar_dados_clientes.clear()
+        carregar_historico_cli.clear()
+        carregar_historico_est.clear()
+
+    garantir_cabecalhos() 
 
 except Exception as e:
-    st.error(f"Erro de conexão: {e}")
+    st.error(f"Erro de conexão. Aguarde 1 minuto e recarregue a página. ({e})")
     st.stop()
 
 # --- FUNÇÕES ÚTEIS ---
-def cvt_num(valor): # Converter para numero seguro
+def cvt_num(valor): 
     if not valor: return 0.0
     v = str(valor).replace("R$", "").replace(" ", "").strip()
     if "," in v: v = v.replace(".", "").replace(",", ".")
@@ -137,26 +165,19 @@ with st.sidebar:
         st.rerun()
 
 # ==========================================
-# 📦 ESTOQUE (BLINDADO)
+# 📦 ESTOQUE
 # ==========================================
 if menu == "📦 Estoque":
     st.title("📦 Gestão de Estoque")
     
-    # Carregamento Seguro (Try/Except para evitar tela de erro)
-    try:
-        dados = sheet_estoque.get_all_records()
-        df_est = pd.DataFrame(dados)
-    except Exception as e:
-        st.error("Erro ao ler planilha. Tentando corrigir automaticamente...")
-        garantir_cabecalhos()
-        st.rerun() # Recarrega a página
+    # Usa o Cache para carregar
+    df_est = carregar_dados_estoque()
 
     t1, t2, t3 = st.tabs(["📋 Lista", "🆕 Novo", "✏️ Editar"])
 
     # --- LISTA ---
     with t1:
         if not df_est.empty:
-            # Garante coluna ML visualmente
             if 'ML' not in df_est.columns: df_est['ML'] = "-"
             
             df_est['custo_n'] = df_est['Custo'].apply(cvt_num)
@@ -168,7 +189,7 @@ if menu == "📦 Estoque":
             
             st.dataframe(df_est[['Nome', 'Tipo', 'ML', 'Físico', 'Custo (R$)', 'Venda (R$)', 'Lucro (R$)', 'Fornecedor', 'Data Compra']], use_container_width=True)
         else:
-            st.info("Estoque vazio. Cadastre o primeiro produto!")
+            st.info("Estoque vazio.")
 
     # --- NOVO ---
     with t2:
@@ -201,13 +222,14 @@ if menu == "📦 Estoque":
             if not nome or not custo or not venda:
                 st.warning("Preencha Nome e Preços!")
             else:
-                # Salva garantindo tipos seguros (Strings para valores visuais)
                 sheet_estoque.append_row([
                     nome, tipo, forn, 
                     save_str(cvt_num(custo)), save_str(cvt_num(venda)), 
                     int(total_ini), dt.strftime('%d/%m/%Y'), int(ref), str(ml_final)
                 ])
                 sheet_hist_est.append_row([datetime.now().strftime('%d/%m/%Y %H:%M'), nome, "NOVO", int(total_ini), forn])
+                
+                limpar_cache() # Força atualização
                 st.success("Salvo!"); time.sleep(1); st.rerun()
 
     # --- EDITAR ---
@@ -215,11 +237,10 @@ if menu == "📦 Estoque":
         if not df_est.empty:
             sel = st.selectbox("Editar:", ["Selecione..."] + df_est['Nome'].tolist())
             if sel != "Selecione...":
-                idx = df_est[df_est['Nome'] == sel].index[0] # Pega indice Pandas
+                idx = df_est[df_est['Nome'] == sel].index[0]
                 row = df_est.iloc[idx]
                 
                 st.info(f"Editando: {sel}")
-                # ML Inteligente
                 ml_db = str(row.get('ML', '350ml'))
                 idx_ml = lista_ml.index(ml_db) if ml_db in lista_ml else lista_ml.index("Outros")
                 
@@ -244,20 +265,20 @@ if menu == "📦 Estoque":
                     atual = int(cvt_num(row['Estoque']))
                     novo_total = atual + (add_f * ref) + add_u
                     
-                    # Atualiza Células (Index + 2 porque Planilha começa em 1 e tem cabeçalho)
                     sheet_estoque.update_cell(idx+2, 4, save_str(cvt_num(n_custo)))
                     sheet_estoque.update_cell(idx+2, 5, save_str(cvt_num(n_venda)))
                     sheet_estoque.update_cell(idx+2, 6, int(novo_total))
-                    sheet_estoque.update_cell(idx+2, 9, str(ml_save)) # Atualiza ML
+                    sheet_estoque.update_cell(idx+2, 9, str(ml_save))
                     
                     if (add_f * ref) + add_u > 0:
                          sheet_hist_est.append_row([datetime.now().strftime('%d/%m/%Y %H:%M'), sel, "ENTRADA", (add_f * ref) + add_u, "Ajuste Manual"])
+                    
+                    limpar_cache() # Força atualização
                     st.success("Atualizado!"); time.sleep(1); st.rerun()
 
-                # CORREÇÃO DO ERRO DE EXCLUIR:
-                # O erro era delete_rows(idx+2). O correto é delete_rows(int(idx+2))
                 if col_del.button("🗑️ EXCLUIR PRODUTO"):
-                    sheet_estoque.delete_rows(int(idx + 2)) 
+                    sheet_estoque.delete_rows(int(idx + 2))
+                    limpar_cache() # Força atualização
                     st.warning("Excluído!"); time.sleep(1); st.rerun()
 
 # ==========================================
@@ -273,10 +294,8 @@ elif menu == "💰 Caixa":
             st.session_state.v_suc = False
             st.rerun()
     else:
-        df_cli = pd.DataFrame(sheet_clientes.get_all_records())
-        # Carrega estoque com proteção
-        try: df_est = pd.DataFrame(sheet_estoque.get_all_records())
-        except: df_est = pd.DataFrame()
+        df_cli = carregar_dados_clientes()
+        df_est = carregar_dados_estoque()
 
         sel_cli = st.selectbox("Cliente:", ["🆕 NOVO"] + (df_cli['nome'] + " - " + df_cli['telefone'].astype(str)).tolist() if not df_cli.empty else ["🆕 NOVO"])
         
@@ -326,21 +345,22 @@ elif menu == "💰 Caixa":
                 sheet_hist_cli.append_row([datetime.now().strftime('%d/%m/%Y %H:%M'), nm, tel_clean, pts])
                 msg, btn = msg_zap(nm, pts)
                 
+                limpar_cache() # Força atualização geral
+                
                 st.session_state.link = f"https://api.whatsapp.com/send?phone=55{tel_clean}&text={urllib.parse.quote(msg)}"
                 st.session_state.btn_txt = btn
                 st.session_state.v_suc = True
                 st.rerun()
 
 # ==========================================
-# 👥 CLIENTES E 📊 HISTÓRICOS (SIMPLIFICADO)
+# 👥 CLIENTES E 📊 HISTÓRICOS
 # ==========================================
 elif menu == "👥 Clientes":
     st.title("👥 Clientes")
-    df = pd.DataFrame(sheet_clientes.get_all_records())
-    st.dataframe(df, use_container_width=True)
+    st.dataframe(carregar_dados_clientes(), use_container_width=True)
 
 elif menu == "📊 Históricos":
     st.title("📊 Relatórios")
     t1, t2 = st.tabs(["Vendas", "Estoque"])
-    with t1: st.dataframe(pd.DataFrame(sheet_hist_cli.get_all_records()), use_container_width=True)
-    with t2: st.dataframe(pd.DataFrame(sheet_hist_est.get_all_records()), use_container_width=True)
+    with t1: st.dataframe(carregar_historico_cli(), use_container_width=True)
+    with t2: st.dataframe(carregar_historico_est(), use_container_width=True)
