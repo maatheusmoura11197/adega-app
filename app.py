@@ -10,7 +10,7 @@ import time
 # ==========================================
 # ⚙️ CONFIGURAÇÃO E ESTILO
 # ==========================================
-st.set_page_config(page_title="Adega do Barão - Sistema v27", page_icon="🍷", layout="wide")
+st.set_page_config(page_title="Adega do Barão - Sistema Oficial", page_icon="🍷", layout="wide")
 
 st.markdown("""
     <style>
@@ -44,27 +44,41 @@ st.markdown("""
         padding: 15px; background-color: #e3f2fd; border-left: 5px solid #2196f3;
         border-radius: 5px; color: #0d47a1; font-weight: bold; margin-bottom: 10px;
     }
+    /* Centralizar Login */
+    .login-container {
+        display: flex; justify-content: center; align-items: center; flex-direction: column;
+    }
     </style>
     """, unsafe_allow_html=True)
 
 # ==========================================
-# 🔐 LOGIN (ATIVADO)
+# 🔐 LOGIN (COM BRINDE E ENTER)
 # ==========================================
 SENHA_DO_SISTEMA = "adega123"
 
 if 'logado' not in st.session_state: st.session_state.logado = False
 
 if not st.session_state.logado:
-    st.markdown("<br><br><h1 style='text-align: center;'>🔒 Adega do Barão</h1>", unsafe_allow_html=True)
+    # Centralização Visual
+    col1, col2, col3 = st.columns([1, 1, 1])
     
-    c_a, c_b, c_c = st.columns([1, 2, 1])
-    with c_b:
+    with col2:
+        st.markdown("<br>", unsafe_allow_html=True)
+        # GIF de Brinde
+        st.image("https://media.giphy.com/media/t2sKa4JKNW9DawxAYi/giphy.gif", use_container_width=True)
+        st.markdown("<h1 style='text-align: center;'>Adega do Barão</h1>", unsafe_allow_html=True)
+        
+        # O st.form permite usar o ENTER para enviar
         with st.form("login"):
-            senha = st.text_input("Digite a Senha de Acesso:", type="password")
-            if st.form_submit_button("ACESSAR SISTEMA"):
+            senha = st.text_input("Senha de Acesso:", type="password", placeholder="Digite e aperte Enter ↵")
+            submit = st.form_submit_button("ENTRAR 🍺")
+            
+            if submit:
                 if senha == SENHA_DO_SISTEMA:
-                    st.session_state.logado = True
-                    st.rerun()
+                    with st.spinner("Abrindo o sistema..."):
+                        time.sleep(1.5) # Charme de carregamento
+                        st.session_state.logado = True
+                        st.rerun()
                 else:
                     st.error("🚫 Senha incorreta!")
     st.stop()
@@ -172,7 +186,6 @@ if menu == "📦 Estoque":
     # --- TAB 2: CADASTRO NOVO (SEM FORMULÁRIO PARA REAGIR AO VIVO) ---
     with t2:
         st.subheader("Cadastrar Produto")
-        # Removi st.form para permitir que a caixa de texto apareça instantaneamente
         
         n_nome = st.text_input("Nome do Produto (Obrigatório):").upper()
         
@@ -249,7 +262,6 @@ if menu == "📦 Estoque":
                 list_ml = ["200ml", "210ml", "269ml", "300ml", "330ml", "350ml", "473ml", "550ml", "600ml", "950ml", "1 Litro", "Outros"]
                 ml_banco = str(row.get('ML', '350ml'))
                 
-                # Define índice inicial
                 idx_ml_ini = 5 # Padrão
                 if ml_banco in list_ml:
                     idx_ml_ini = list_ml.index(ml_banco)
@@ -361,7 +373,7 @@ elif menu == "💰 Caixa":
                 
                 sheet_hist_cli.append_row([datetime.now().strftime('%d/%m/%Y %H:%M'), n_c, tl, pts])
                 msg, btn = gerar_mensagem_amigavel(n_c, pts)
-                st.session_state.l_zap = f"https://api.whatsapp.com/send?phone=55{tl}&text={urllib.parse.quote(msg)}"
+                st.session_state.l_zap = f"https://api.whatsapp.com/send?phone=55{tel_l}&text={urllib.parse.quote(msg)}"
                 st.session_state.b_txt = btn; st.session_state.v_suc = True; st.rerun()
 
 # ==========================================
