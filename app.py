@@ -48,7 +48,7 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 # ==========================================
-# 🔐 LOGIN (LINK DA ANIMAÇÃO CORRIGIDO)
+# 🔐 LOGIN (SIMPLES E EFICIENTE)
 # ==========================================
 SENHA_DO_SISTEMA = "adega123"
 
@@ -65,12 +65,12 @@ if not st.session_state.logado:
             
             if submit:
                 if senha == SENHA_DO_SISTEMA:
-                    st.success("Senha Correta! Carregando...")
-                    # Link novo e estável (Canecas Brindando)
-                    st.image("https://media1.tenor.com/m/5-2_9lK2mY8AAAAC/cheers-beer.gif", use_container_width=True)
-                    time.sleep(2.5) 
-                    st.session_state.logado = True
-                    st.rerun()
+                    st.success("✅ Senha Correta!")
+                    # Animação nativa de carregamento (Simples e Funcional)
+                    with st.spinner("Acessando Adega..."):
+                        time.sleep(1) 
+                        st.session_state.logado = True
+                        st.rerun()
                 else:
                     st.error("🚫 Senha incorreta!")
     st.stop()
@@ -153,7 +153,6 @@ if menu == "📦 Estoque":
     # --- TAB 1: VISUALIZAÇÃO ---
     if not df_est.empty:
         with t1:
-            # === AUTO-REPARO ===
             if 'ML' not in df_est.columns:
                 if st.button("🔧 Reparar Coluna ML"):
                     try: sheet_estoque.update_cell(1, 9, "ML"); st.rerun()
@@ -175,7 +174,7 @@ if menu == "📦 Estoque":
                 use_container_width=True
             )
 
-    # --- TAB 2: CADASTRO NOVO (SEM FORMULÁRIO PARA REAGIR AO VIVO) ---
+    # --- TAB 2: CADASTRO NOVO ---
     with t2:
         st.subheader("Cadastrar Produto")
         
@@ -184,7 +183,7 @@ if menu == "📦 Estoque":
         col_t1, col_t2 = st.columns(2)
         n_tipo = col_t1.selectbox("Tipo:", ["LATA", "LONG NECK", "GARRAFA 600ML", "LITRÃO", "OUTROS"])
         
-        # LOGICA ML AO VIVO
+        # ML DINÂMICO
         lista_ml = ["200ml", "210ml", "269ml", "300ml", "330ml", "350ml", "473ml", "550ml", "600ml", "950ml", "1 Litro", "Outros"]
         sel_ml = col_t2.selectbox("Volume (ML):", lista_ml)
         
@@ -233,7 +232,7 @@ if menu == "📦 Estoque":
                 sheet_hist_est.append_row([datetime.now().strftime('%d/%m/%Y %H:%M'), n_nome, "NOVO", qtd_inicial, n_forn])
                 st.success("Cadastrado com Sucesso!"); time.sleep(1); st.rerun()
 
-    # --- TAB 3: EDIÇÃO (SEM FORMULÁRIO PARA REAGIR AO VIVO) ---
+    # --- TAB 3: EDIÇÃO ---
     with t3:
         if not df_est.empty:
             sel_e = st.selectbox("Editar:", ["Selecione..."] + df_est['Nome'].tolist())
@@ -250,11 +249,10 @@ if menu == "📦 Estoque":
                 idx_t = list_tipos.index(t_atual) if t_atual in list_tipos else 0
                 novo_tipo = c_tipo.selectbox("Tipo:", list_tipos, index=idx_t)
                 
-                # LOGICA ML INTELIGENTE
                 list_ml = ["200ml", "210ml", "269ml", "300ml", "330ml", "350ml", "473ml", "550ml", "600ml", "950ml", "1 Litro", "Outros"]
                 ml_banco = str(row.get('ML', '350ml'))
                 
-                idx_ml_ini = 5 # Padrão
+                idx_ml_ini = 5 
                 if ml_banco in list_ml:
                     idx_ml_ini = list_ml.index(ml_banco)
                 else:
