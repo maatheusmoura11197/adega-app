@@ -10,7 +10,7 @@ import time
 # ==========================================
 # ⚙️ CONFIGURAÇÃO E ESTILO
 # ==========================================
-st.set_page_config(page_title="Adega do Barão - Sistema Oficial", page_icon="🍷", layout="wide")
+st.set_page_config(page_title="Adega do Barão - Sistema v27", page_icon="🍷", layout="wide")
 
 st.markdown("""
     <style>
@@ -56,7 +56,6 @@ if 'logado' not in st.session_state: st.session_state.logado = False
 
 if not st.session_state.logado:
     st.markdown("<br><br><h1 style='text-align: center;'>🔒 Adega do Barão</h1>", unsafe_allow_html=True)
-    st.markdown("<p style='text-align: center;'>Sistema de Gestão e Fidelidade</p>", unsafe_allow_html=True)
     
     c_a, c_b, c_c = st.columns([1, 2, 1])
     with c_b:
@@ -148,8 +147,8 @@ if menu == "📦 Estoque":
     # --- TAB 1: VISUALIZAÇÃO ---
     if not df_est.empty:
         with t1:
+            # === AUTO-REPARO ===
             if 'ML' not in df_est.columns:
-                st.warning("⚠️ Coluna ML não encontrada.")
                 if st.button("🔧 Reparar Coluna ML"):
                     try: sheet_estoque.update_cell(1, 9, "ML"); st.rerun()
                     except: pass
@@ -170,65 +169,66 @@ if menu == "📦 Estoque":
                 use_container_width=True
             )
 
-    # --- TAB 2: CADASTRO NOVO ---
+    # --- TAB 2: CADASTRO NOVO (SEM FORMULÁRIO PARA REAGIR AO VIVO) ---
     with t2:
         st.subheader("Cadastrar Produto")
-        with st.form("novo_prod"):
-            n_nome = st.text_input("Nome do Produto (Obrigatório):").upper()
-            
-            col_t1, col_t2 = st.columns(2)
-            n_tipo = col_t1.selectbox("Tipo:", ["LATA", "LONG NECK", "GARRAFA 600ML", "LITRÃO", "OUTROS"])
-            
-            # LÓGICA ML PERSONALIZADO
-            lista_ml = ["200ml", "210ml", "269ml", "300ml", "330ml", "350ml", "473ml", "550ml", "600ml", "950ml", "1 Litro", "Outros"]
-            sel_ml = col_t2.selectbox("Volume (ML):", lista_ml)
-            
-            if sel_ml == "Outros":
-                n_ml = col_t2.text_input("Digite o volume (ex: 750ml):")
-            else:
-                n_ml = sel_ml
+        # Removi st.form para permitir que a caixa de texto apareça instantaneamente
+        
+        n_nome = st.text_input("Nome do Produto (Obrigatório):").upper()
+        
+        col_t1, col_t2 = st.columns(2)
+        n_tipo = col_t1.selectbox("Tipo:", ["LATA", "LONG NECK", "GARRAFA 600ML", "LITRÃO", "OUTROS"])
+        
+        # LOGICA ML AO VIVO
+        lista_ml = ["200ml", "210ml", "269ml", "300ml", "330ml", "350ml", "473ml", "550ml", "600ml", "950ml", "1 Litro", "Outros"]
+        sel_ml = col_t2.selectbox("Volume (ML):", lista_ml)
+        
+        if sel_ml == "Outros":
+            n_ml = col_t2.text_input("Digite o volume (ex: 750ml):", key="novo_ml_custom")
+        else:
+            n_ml = sel_ml
 
-            c1, c2 = st.columns(2)
-            n_custo = c1.text_input("Custo Unitário R$ (Obrigatório):", placeholder="3.06")
-            n_venda = c2.text_input("Venda Unitária R$ (Obrigatório):", placeholder="4.99")
+        c1, c2 = st.columns(2)
+        n_custo = c1.text_input("Custo Unitário R$ (Obrigatório):", placeholder="3.06")
+        n_venda = c2.text_input("Venda Unitária R$ (Obrigatório):", placeholder="4.99")
+        
+        c3, c4 = st.columns(2)
+        n_forn = c3.text_input("Fornecedor (Obrigatório):")
+        n_data = c4.date_input("Data da Compra", date.today())
+        
+        st.divider()
+        st.write("📦 **Estoque Inicial:**")
+        tipo_compra = st.radio("Formato da Compra:", ["Fardo Fechado", "Unidades Soltas"], horizontal=True)
+        col_a, col_b = st.columns(2)
+        n_ref = col_a.number_input("Itens por Fardo (Ref):", value=12)
+        
+        qtd_inicial = 0
+        if tipo_compra == "Fardo Fechado":
+            q_f = col_b.number_input("Qtd Fardos:", min_value=0)
+            qtd_inicial = q_f * n_ref
+        else:
+            q_u = col_b.number_input("Qtd Unidades:", min_value=0)
+            qtd_inicial = q_u
+        
+        if st.button("✅ CADASTRAR PRODUTO", type="primary"):
+            erro = False
+            if not n_nome: st.error("⚠️ Nome Obrigatório"); erro = True
+            if not n_custo: st.error("⚠️ Custo Obrigatório"); erro = True
+            if not n_venda: st.error("⚠️ Venda Obrigatória"); erro = True
+            if not n_forn: st.error("⚠️ Fornecedor Obrigatório"); erro = True
+            if sel_ml == "Outros" and not n_ml: st.error("⚠️ Digite o ML personalizado"); erro = True
             
-            c3, c4 = st.columns(2)
-            n_forn = c3.text_input("Fornecedor (Obrigatório):")
-            n_data = c4.date_input("Data da Compra", date.today())
-            
-            st.divider()
-            st.write("📦 **Estoque Inicial:**")
-            tipo_compra = st.radio("Formato da Compra:", ["Fardo Fechado", "Unidades Soltas"], horizontal=True)
-            col_a, col_b = st.columns(2)
-            n_ref = col_a.number_input("Itens por Fardo (Ref):", value=12)
-            
-            qtd_inicial = 0
-            if tipo_compra == "Fardo Fechado":
-                q_f = col_b.number_input("Qtd Fardos:", min_value=0)
-                qtd_inicial = q_f * n_ref
-            else:
-                q_u = col_b.number_input("Qtd Unidades:", min_value=0)
-                qtd_inicial = q_u
-            
-            if st.form_submit_button("✅ CADASTRAR"):
-                erro = False
-                if not n_nome: st.error("⚠️ Nome Obrigatório"); erro = True
-                if not n_custo: st.error("⚠️ Custo Obrigatório"); erro = True
-                if not n_venda: st.error("⚠️ Venda Obrigatória"); erro = True
-                if not n_forn: st.error("⚠️ Fornecedor Obrigatório"); erro = True
-                if sel_ml == "Outros" and not n_ml: st.error("⚠️ Digite o ML personalizado"); erro = True
-                
-                if not erro:
-                    sheet_estoque.append_row([
-                        n_nome, n_tipo, n_forn, 
-                        salvar_com_ponto(converter_input_para_numero(n_custo)), 
-                        salvar_com_ponto(converter_input_para_numero(n_venda)), 
-                        qtd_inicial, n_data.strftime('%d/%m/%Y'), n_ref, n_ml
-                    ])
-                    sheet_hist_est.append_row([datetime.now().strftime('%d/%m/%Y %H:%M'), n_nome, "NOVO", qtd_inicial, n_forn])
-                    st.success("Cadastrado com Sucesso!"); time.sleep(1); st.rerun()
+            if not erro:
+                sheet_estoque.append_row([
+                    n_nome, n_tipo, n_forn, 
+                    salvar_com_ponto(converter_input_para_numero(n_custo)), 
+                    salvar_com_ponto(converter_input_para_numero(n_venda)), 
+                    qtd_inicial, n_data.strftime('%d/%m/%Y'), n_ref, n_ml
+                ])
+                sheet_hist_est.append_row([datetime.now().strftime('%d/%m/%Y %H:%M'), n_nome, "NOVO", qtd_inicial, n_forn])
+                st.success("Cadastrado com Sucesso!"); time.sleep(1); st.rerun()
 
-    # --- TAB 3: EDIÇÃO ---
+    # --- TAB 3: EDIÇÃO (SEM FORMULÁRIO PARA REAGIR AO VIVO) ---
     with t3:
         if not df_est.empty:
             sel_e = st.selectbox("Editar:", ["Selecione..."] + df_est['Nome'].tolist())
@@ -236,67 +236,65 @@ if menu == "📦 Estoque":
                 idx = df_est[df_est['Nome'] == sel_e].index[0]
                 row = df_est.iloc[idx]
                 
-                with st.form("edit_est_form"):
-                    st.info(f"Editando: {sel_e}")
-                    
-                    c_tipo, c_ml = st.columns(2)
-                    # Tipo
-                    list_tipos = ["LATA", "LONG NECK", "GARRAFA 600ML", "LITRÃO", "OUTROS"]
-                    t_atual = row.get('Tipo', 'LATA')
-                    idx_t = list_tipos.index(t_atual) if t_atual in list_tipos else 0
-                    novo_tipo = c_tipo.selectbox("Tipo:", list_tipos, index=idx_t)
-                    
-                    # LÓGICA ML INTELIGENTE NA EDIÇÃO
-                    list_ml = ["200ml", "210ml", "269ml", "300ml", "330ml", "350ml", "473ml", "550ml", "600ml", "950ml", "1 Litro", "Outros"]
-                    ml_banco = str(row.get('ML', '350ml'))
-                    
-                    # Se o ML do banco não está na lista padrão, seleciona "Outros" automaticamente
-                    if ml_banco in list_ml:
-                        idx_ml = list_ml.index(ml_banco)
-                        sel_ml_edit = c_ml.selectbox("Volume (ML):", list_ml, index=idx_ml)
-                        final_ml = sel_ml_edit
-                    else:
-                        idx_ml = list_ml.index("Outros")
-                        sel_ml_edit = c_ml.selectbox("Volume (ML):", list_ml, index=idx_ml)
-                        final_ml = c_ml.text_input("Digite o volume personalizado:", value=ml_banco)
-                    
-                    # Se o usuário mudar para "Outros" manualmente
-                    if sel_ml_edit == "Outros" and ml_banco in list_ml:
-                         final_ml = c_ml.text_input("Digite o volume personalizado:")
+                st.info(f"Editando: {sel_e}")
+                
+                c_tipo, c_ml = st.columns(2)
+                
+                list_tipos = ["LATA", "LONG NECK", "GARRAFA 600ML", "LITRÃO", "OUTROS"]
+                t_atual = row.get('Tipo', 'LATA')
+                idx_t = list_tipos.index(t_atual) if t_atual in list_tipos else 0
+                novo_tipo = c_tipo.selectbox("Tipo:", list_tipos, index=idx_t)
+                
+                # LOGICA ML INTELIGENTE
+                list_ml = ["200ml", "210ml", "269ml", "300ml", "330ml", "350ml", "473ml", "550ml", "600ml", "950ml", "1 Litro", "Outros"]
+                ml_banco = str(row.get('ML', '350ml'))
+                
+                # Define índice inicial
+                idx_ml_ini = 5 # Padrão
+                if ml_banco in list_ml:
+                    idx_ml_ini = list_ml.index(ml_banco)
+                else:
+                    idx_ml_ini = list_ml.index("Outros")
 
-                    # Preços e Dados
-                    c_a, c_b = st.columns(2)
-                    v_venda = c_a.text_input("Venda (R$):", value=str(row['Venda']))
-                    v_custo = c_b.text_input("Custo (R$):", value=str(row['Custo']))
-                    v_forn = st.text_input("Fornecedor:", value=str(row.get('Fornecedor', '')))
+                sel_ml_edit = c_ml.selectbox("Volume (ML):", list_ml, index=idx_ml_ini, key="ml_edit_select")
+                
+                final_ml = sel_ml_edit
+                if sel_ml_edit == "Outros":
+                    val_padrao = ml_banco if ml_banco not in list_ml else ""
+                    final_ml = c_ml.text_input("Digite o volume personalizado:", value=val_padrao, key="ml_edit_custom")
+
+                c_a, c_b = st.columns(2)
+                v_venda = c_a.text_input("Venda (R$):", value=str(row['Venda']))
+                v_custo = c_b.text_input("Custo (R$):", value=str(row['Custo']))
+                v_forn = st.text_input("Fornecedor:", value=str(row.get('Fornecedor', '')))
+                
+                st.write("---")
+                st.write("➕ **Adicionar Estoque:**")
+                f1, f2 = st.columns(2)
+                add_f = f1.number_input("Add Fardos:", min_value=0)
+                add_u = f2.number_input("Add Unidades:", min_value=0)
+                
+                b_sal, b_exc = st.columns(2)
+                if b_sal.button("💾 SALVAR ALTERAÇÕES"):
+                    ref = int(converter_input_para_numero(row.get('Qtd_Fardo', 12)))
+                    est_atual = int(converter_input_para_numero(row['Estoque']))
+                    novo_tot = est_atual + (add_f * ref) + add_u
                     
-                    st.write("---")
-                    st.write("➕ **Adicionar Estoque:**")
-                    f1, f2 = st.columns(2)
-                    add_f = f1.number_input("Add Fardos:", min_value=0)
-                    add_u = f2.number_input("Add Unidades:", min_value=0)
+                    sheet_estoque.update_cell(idx+2, 2, novo_tipo)
+                    sheet_estoque.update_cell(idx+2, 3, v_forn)
+                    sheet_estoque.update_cell(idx+2, 4, salvar_com_ponto(converter_input_para_numero(v_custo)))
+                    sheet_estoque.update_cell(idx+2, 5, salvar_com_ponto(converter_input_para_numero(v_venda)))
+                    sheet_estoque.update_cell(idx+2, 6, novo_tot)
+                    sheet_estoque.update_cell(idx+2, 7, date.today().strftime('%d/%m/%Y'))
+                    try: sheet_estoque.update_cell(idx+2, 9, final_ml)
+                    except: pass
                     
-                    b_sal, b_exc = st.columns(2)
-                    if b_sal.form_submit_button("💾 SALVAR"):
-                        ref = int(converter_input_para_numero(row.get('Qtd_Fardo', 12)))
-                        est_atual = int(converter_input_para_numero(row['Estoque']))
-                        novo_tot = est_atual + (add_f * ref) + add_u
-                        
-                        sheet_estoque.update_cell(idx+2, 2, novo_tipo)
-                        sheet_estoque.update_cell(idx+2, 3, v_forn)
-                        sheet_estoque.update_cell(idx+2, 4, salvar_com_ponto(converter_input_para_numero(v_custo)))
-                        sheet_estoque.update_cell(idx+2, 5, salvar_com_ponto(converter_input_para_numero(v_venda)))
-                        sheet_estoque.update_cell(idx+2, 6, novo_tot)
-                        sheet_estoque.update_cell(idx+2, 7, date.today().strftime('%d/%m/%Y'))
-                        try: sheet_estoque.update_cell(idx+2, 9, final_ml)
-                        except: pass
-                        
-                        if (add_f * ref) + add_u > 0:
-                            sheet_hist_est.append_row([datetime.now().strftime('%d/%m/%Y %H:%M'), sel_e, "ENTRADA", (add_f * ref) + add_u, f"Forn: {v_forn}"])
-                        st.success("Atualizado!"); time.sleep(1); st.rerun()
-                    
-                    if b_exc.form_submit_button("🗑️ EXCLUIR", type="primary"):
-                        sheet_estoque.delete_rows(int(idx + 2)); st.warning("Excluído!"); time.sleep(1); st.rerun()
+                    if (add_f * ref) + add_u > 0:
+                        sheet_hist_est.append_row([datetime.now().strftime('%d/%m/%Y %H:%M'), sel_e, "ENTRADA", (add_f * ref) + add_u, f"Forn: {v_forn}"])
+                    st.success("Atualizado!"); time.sleep(1); st.rerun()
+                
+                if b_exc.button("🗑️ EXCLUIR PRODUTO"):
+                    sheet_estoque.delete_rows(int(idx + 2)); st.warning("Excluído!"); time.sleep(1); st.rerun()
 
 # ==========================================
 # 💰 CAIXA
