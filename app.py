@@ -10,7 +10,7 @@ import time
 # ==========================================
 # ⚙️ CONFIGURAÇÃO E ESTILO
 # ==========================================
-st.set_page_config(page_title="Adega do Barão v15", page_icon="🍷", layout="wide")
+st.set_page_config(page_title="Adega do Barão v16", page_icon="🍷", layout="wide")
 
 st.markdown("""
     <style>
@@ -19,8 +19,7 @@ st.markdown("""
         text-align: center; font-weight: bold; font-size: 22px; margin-top: 10px;
         text-decoration: none; display: block; border: none;
     }
-    .stTabs [data-baseweb="tab-list"] { gap: 10px; }
-    .stTabs [data-baseweb="tab"] { background-color: #f0f2f6; border-radius: 5px; padding: 10px; }
+    .stButton>button { width: 100%; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -35,14 +34,14 @@ try:
     sheet_clientes = planilha.worksheet("Página1") 
     sheet_estoque = planilha.worksheet("Estoque") 
     sheet_hist_est = planilha.worksheet("Historico_Estoque")
-    sheet_hist_cli = planilha.worksheet("Historico")
 except:
     st.error("Erro na conexão com as planilhas.")
     st.stop()
 
-# --- FUNÇÕES DE APOIO ---
-def limpar_valor(valor):
+# --- FUNÇÕES DE LIMPEZA ---
+def limpar_para_numero(valor):
     if not valor or str(valor).strip() == "": return 0.0
+    # Remove R$, espaços e converte vírgula em ponto
     v = str(valor).replace("R$", "").replace(" ", "").strip()
     if "," in v:
         if v.count(".") > 0: v = v.replace(".", "")
@@ -56,118 +55,131 @@ def para_texto_br(valor):
 def gerar_mensagem_amigavel(nome_cliente, pontos):
     nome = nome_cliente.split()[0].capitalize()
     if pontos == 1:
-        msg = f"Oi, {nome}! Tudo bem? 😊\n\nPassando para agradecer pela compra hoje na Adega do Barão! ✨\n\nJá abri seu *Cartão Fidelidade* aqui. A cada 10 compras você ganha um prêmio! Você garantiu o seu 1º ponto. É um prazer ter você aqui! 🍷"
+        msg = f"Oi, {nome}! 😊\n\nAgradecemos pela compra na Adega do Barão! ✨\n\nJá abri seu *Cartão Fidelidade*. A cada 10 compras você ganha um prêmio! Você garantiu o seu 1º ponto. 🍷"
         btn = "Enviar Boas-Vindas 🎉"
     elif 1 < pontos < 10:
         faltam = 10 - pontos
-        alerta = "Falta só UM para o prêmio! 😱" if faltam == 1 else f"Faltam só {faltam} para o seu prêmio!"
-        msg = f"E aí, {nome}! Como estão as coisas? 👊\n\nSua compra foi registrada! Agora você tem *{pontos} pontos*. ✨\n\n{alerta} Valeu demais pela parceria! 🍻"
+        msg = f"E aí, {nome}! 👊\n\nSua compra foi registrada! Agora você tem *{pontos} pontos*. ✨\n\nFaltam só {faltam} para o prêmio! Valeu pela parceria! 🍻"
         btn = f"Enviar Saldo ({pontos}/10) 📲"
     else: 
-        msg = f"OLHA SÓ! Parabéns, {nome}!!! ✨🏆\n\nVocê completou seus *10 pontos*! \n\nVocê ganhou um **DESCONTO DE 20%** em qualquer produto hoje! Aproveite, você merece! 🥳🍷"
+        msg = f"PARABÉNS, {nome}!!! ✨🏆\n\nVocê completou 10 pontos e ganhou um **DESCONTO DE 20%** em qualquer produto hoje! Você merece! 🥳🍷"
         btn = "🏆 ENVIAR PRÊMIO DE 20%!"
     return msg, btn
 
 # ==========================================
-# 📱 MENU LATERAL (RESTAURADO)
+# 📱 MENU LATERAL
 # ==========================================
 with st.sidebar:
     st.title("🍷 Adega do Barão")
-    menu = st.radio("Escolha a função:", 
-                    ["💰 Caixa & Fidelidade", 
-                     "📦 Estoque (Ver/Editar)", 
-                     "👥 Gerenciar Clientes", 
-                     "📊 Relatórios de Vendas"])
-    st.divider()
-    if st.button("Sair"): st.stop()
+    menu = st.radio("Navegar:", ["💰 Caixa & Fidelidade", "📦 Estoque & Lucros", "👥 Clientes", "📊 Histórico"])
 
 # ==========================================
-# 📦 MÓDULO ESTOQUE (COMPLETO)
+# 📦 MÓDULO ESTOQUE E LUCROS
 # ==========================================
-if menu == "📦 Estoque (Ver/Editar)":
-    st.title("📦 Controle de Estoque")
+if menu == "📦 Estoque & Lucros":
+    st.title("📦 Gestão de Estoque e Rentabilidade")
     df_est = pd.DataFrame(sheet_estoque.get_all_records())
-    tab1, tab2 = st.tabs(["📋 Estoque Atual (Fardos)", "✏️ Ajustar Preço e Qtd"])
+    
+    tab1, tab2 = st.tabs(["📊 Visão Geral e Lucros", "✏️ Editar / Apagar Item"])
 
     if not df_est.empty:
-        with tab1:
-            def formatar_estoque_humano(row):
-                total_un = int(limpar_valor(row['Estoque']))
-                ref_fardo = int(limpar_valor(row.get('Qtd_Fardo', 12)))
-                fardos = total_un // ref_fardo
-                sobra = total_un % ref_fardo
-                if fardos > 0 and sobra > 0: return f"📦 {fardos} fardos e {sobra} un"
-                elif fardos > 0: return f"📦 {fardos} fardos"
-                else: return f"🍺 {sobra} un"
+        # Converter colunas para números para evitar erros
+        df_est['venda_n'] = df_est['Venda'].apply(limpar_para_numero)
+        df_est['custo_n'] = df_est['Custo'].apply(limpar_para_numero)
+        df_est['estoque_n'] = df_est['Estoque'].apply(limpar_para_numero).astype(int)
+        
+        # Cálculos de Lucro
+        df_est['Lucro Un.'] = df_est['venda_n'] - df_est['custo_n']
+        df_est['Lucro Total Est.'] = df_est['Lucro Un.'] * df_est['estoque_n']
 
-            df_est['Situação Real'] = df_est.apply(formatar_estoque_humano, axis=1)
-            st.dataframe(df_est[['Nome', 'Situação Real', 'Venda', 'Estoque']], use_container_width=True)
+        with tab1:
+            st.subheader("Cálculo de Lucro Baseado no Estoque Atual")
+            lucro_total_adega = df_est['Lucro Total Est.'].sum()
+            st.metric("Lucro Potencial Total (Estoque)", f"R$ {lucro_total_adega:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+            
+            # Formatação para exibição
+            df_view = df_est[['Nome', 'estoque_n', 'venda_n', 'custo_n', 'Lucro Un.', 'Lucro Total Est.']].copy()
+            df_view.columns = ['Produto', 'Qtd Unidades', 'Venda (R$)', 'Custo (R$)', 'Lucro p/ Un.', 'Lucro no Estoque']
+            st.dataframe(df_view, use_container_width=True)
 
         with tab2:
-            item_edit = st.selectbox("Selecione o produto para alterar:", ["Selecione..."] + df_est['Nome'].tolist())
-            if item_edit != "Selecione...":
-                idx = df_est[df_est['Nome'] == item_edit].index[0]
+            st.subheader("Alterar ou Remover Produto")
+            item_sel = st.selectbox("Selecione o produto:", ["Selecione..."] + df_est['Nome'].tolist())
+            
+            if item_sel != "Selecione...":
+                idx = df_est[df_est['Nome'] == item_sel].index[0]
                 row = df_est.iloc[idx]
-                with st.form("form_edit_completo"):
-                    col1, col2 = st.columns(2)
-                    venda_atual = col1.text_input("Novo Preço de Venda (R$):", value=str(row['Venda']))
-                    custo_atual = col2.text_input("Novo Preço de Custo (R$):", value=str(row['Custo']))
+                
+                with st.form("form_edit"):
+                    c1, c2 = st.columns(2)
+                    nova_venda = c1.text_input("Preço de Venda (R$):", value=str(row['Venda']))
+                    novo_custo = c2.text_input("Preço de Custo (R$):", value=str(row['Custo']))
                     
-                    st.divider()
-                    st.write("Atualizar Quantidade Físicas:")
+                    st.write("---")
                     c3, c4, c5 = st.columns(3)
-                    ref_f = c3.number_input("Itens por Fardo:", value=int(limpar_valor(row.get('Qtd_Fardo', 12))))
+                    ref_f = c3.number_input("Itens por Fardo (Ref):", value=int(limpar_para_numero(row.get('Qtd_Fardo', 12))))
                     n_f = c4.number_input("Qtd Fardos Inteiros:", value=0)
                     n_u = c5.number_input("Qtd Latas Soltas:", value=0)
                     
-                    if st.form_submit_button("💾 Salvar Todas as Alterações"):
-                        total_novo = (n_f * ref_f) + n_u
-                        sheet_estoque.update_cell(idx+2, 4, custo_atual.replace(".", ","))
-                        sheet_estoque.update_cell(idx+2, 5, venda_atual.replace(".", ","))
-                        sheet_estoque.update_cell(idx+2, 6, int(total_novo))
+                    st.divider()
+                    col_btn_salvar, col_btn_del = st.columns(2)
+                    
+                    if col_btn_salvar.form_submit_button("💾 SALVAR ALTERAÇÕES", type="primary"):
+                        total_n = (n_f * ref_f) + n_u
+                        sheet_estoque.update_cell(idx+2, 4, novo_custo.replace(".", ","))
+                        sheet_estoque.update_cell(idx+2, 5, nova_venda.replace(".", ","))
+                        sheet_estoque.update_cell(idx+2, 6, int(total_n))
                         sheet_estoque.update_cell(idx+2, 8, int(ref_f))
-                        st.success("Produto atualizado com sucesso!")
+                        st.success("Dados atualizados!")
+                        time.sleep(1)
+                        st.rerun()
+                        
+                    if col_btn_del.form_submit_button("🗑️ EXCLUIR PRODUTO"):
+                        # Deleta a linha na planilha (idx+2 porque começa em 1 e tem cabeçalho)
+                        sheet_estoque.delete_rows(int(idx + 2))
+                        st.warning(f"O produto {item_sel} foi removido.")
                         time.sleep(1)
                         st.rerun()
 
 # ==========================================
-# 💰 CAIXA & FIDELIDADE (RESTAURADO)
+# 💰 CAIXA & FIDELIDADE
 # ==========================================
 elif menu == "💰 Caixa & Fidelidade":
-    if 'venda_sucesso' not in st.session_state: st.session_state.venda_sucesso = False
+    if 'v_sucesso' not in st.session_state: st.session_state.v_sucesso = False
     
-    if st.session_state.venda_sucesso:
-        st.success("✅ Venda Registrada!")
-        st.markdown(f'<a href="{st.session_state.link_zap}" target="_blank" class="big-btn">{st.session_state.txt_btn}</a>', unsafe_allow_html=True)
-        if st.button("Nova Venda"): st.session_state.venda_sucesso = False; st.rerun()
+    if st.session_state.v_sucesso:
+        st.success("✅ Venda Concluída!")
+        st.markdown(f'<a href="{st.session_state.l_zap}" target="_blank" class="big-btn">{st.session_state.t_btn}</a>', unsafe_allow_html=True)
+        if st.button("Nova Venda"): st.session_state.v_sucesso = False; st.rerun()
     else:
         df_cli = pd.DataFrame(sheet_clientes.get_all_records())
         df_est = pd.DataFrame(sheet_estoque.get_all_records())
         
-        sel_cli = st.selectbox("Cliente:", ["🆕 NOVO"] + (df_cli['nome'] + " - " + df_cli['telefone'].astype(str)).tolist())
+        sel_c = st.selectbox("Cliente:", ["🆕 NOVO"] + (df_cli['nome'] + " - " + df_cli['telefone'].astype(str)).tolist())
         c1, c2 = st.columns(2)
-        if sel_cli == "🆕 NOVO":
+        if sel_c == "🆕 NOVO":
             nome_c = c1.text_input("Nome:").upper(); tel_c = c2.text_input("WhatsApp:")
         else:
-            nome_c = sel_cli.split(" - ")[0]; tel_c = sel_cli.split(" - ")[1]
+            nome_c = sel_c.split(" - ")[0]; tel_c = sel_c.split(" - ")[1]
         
         st.divider()
         if not df_est.empty:
-            prod_sel = st.selectbox("Produto:", ["(Apenas Ponto)"] + df_est['Nome'].tolist())
+            p_sel = st.selectbox("Produto:", ["(Apenas Ponto)"] + df_est['Nome'].tolist())
             q1, q2 = st.columns(2)
             v_f = q1.number_input("Fardos:", min_value=0); v_u = q2.number_input("Unidades:", min_value=0)
 
             if st.button("✅ FINALIZAR VENDA", type="primary"):
                 tel_l = re.sub(r'\D', '', tel_c)
-                if prod_sel != "(Apenas Ponto)":
-                    idx_p = df_est[df_est['Nome'] == prod_sel].index[0]
-                    ref_f = int(limpar_valor(df_est.iloc[idx_p].get('Qtd_Fardo', 12)))
+                if p_sel != "(Apenas Ponto)":
+                    idx_p = df_est[df_est['Nome'] == p_sel].index[0]
+                    ref_f = int(limpar_para_numero(df_est.iloc[idx_p].get('Qtd_Fardo', 12)))
                     total_v = (v_f * ref_f) + v_u
-                    novo_e = int(limpar_valor(df_est.iloc[idx_p]['Estoque'])) - total_v
+                    novo_e = int(limpar_para_numero(df_est.iloc[idx_p]['Estoque'])) - total_v
                     sheet_estoque.update_cell(idx_p+2, 6, int(novo_e))
                 
-                df_cli['t_l'] = df_cli['telefone'].astype(str).apply(lambda x: re.sub(r'\D', '', x))
-                match = df_cli[df_cli['t_l'] == tel_l]
+                # Fidelidade
+                df_cli['tl'] = df_cli['telefone'].astype(str).apply(lambda x: re.sub(r'\D', '', x))
+                match = df_cli[df_cli['tl'] == tel_l]
                 if not match.empty:
                     pts = int(match.iloc[0]['compras']) + 1
                     sheet_clientes.update_cell(int(match.index[0]+2), 3, pts)
@@ -176,40 +188,16 @@ elif menu == "💰 Caixa & Fidelidade":
                     sheet_clientes.append_row([nome_c, tel_l, 1, date.today().strftime('%d/%m/%Y')])
                 
                 msg, btn = gerar_mensagem_amigavel(nome_c, pts)
-                st.session_state.link_zap = f"https://api.whatsapp.com/send?phone=55{tel_l}&text={urllib.parse.quote(msg)}"
-                st.session_state.txt_btn = btn
-                st.session_state.venda_sucesso = True
+                st.session_state.l_zap = f"https://api.whatsapp.com/send?phone=55{tel_l}&text={urllib.parse.quote(msg)}"
+                st.session_state.t_btn = btn
+                st.session_state.v_sucesso = True
                 st.rerun()
 
-# ==========================================
-# 👥 GERENCIAR CLIENTES (RESTAURADO)
-# ==========================================
-elif menu == "👥 Gerenciar Clientes":
-    st.title("👥 Gestão de Clientes")
-    df_c = pd.DataFrame(sheet_clientes.get_all_records())
-    if not df_c.empty:
-        df_c['Display'] = df_c['nome'] + " - " + df_c['telefone'].astype(str)
-        sel = st.selectbox("Selecione o Cliente:", df_c['Display'].tolist())
-        idx = df_c[df_c['Display'] == sel].index[0]
-        with st.form("edit_cli"):
-            n_n = st.text_input("Nome:", value=df_c.iloc[idx]['nome'])
-            n_t = st.text_input("Telefone:", value=str(df_c.iloc[idx]['telefone']))
-            n_p = st.number_input("Pontos:", value=int(df_c.iloc[idx]['compras']))
-            if st.form_submit_button("Salvar Alterações"):
-                sheet_clientes.update_cell(idx+2, 1, n_n)
-                sheet_clientes.update_cell(idx+2, 2, n_t)
-                sheet_clientes.update_cell(idx+2, 3, n_p)
-                st.success("Salvo!"); st.rerun()
+# --- Funções básicas para manter o sistema rodando ---
+elif menu == "👥 Clientes":
+    st.title("👥 Clientes")
+    st.dataframe(pd.DataFrame(sheet_clientes.get_all_records()), use_container_width=True)
 
-# ==========================================
-# 📊 RELATÓRIOS (RESTAURADO)
-# ==========================================
-elif menu == "📊 Relatórios de Vendas":
-    st.title("📊 Relatórios")
-    tab_est, tab_fid = st.tabs(["Histórico de Estoque", "Histórico de Clientes"])
-    with tab_est:
-        try: st.dataframe(pd.DataFrame(sheet_hist_est.get_all_records()), use_container_width=True)
-        except: st.write("Aba Histórico_Estoque não encontrada ou vazia.")
-    with tab_fid:
-        try: st.dataframe(pd.DataFrame(sheet_hist_cli.get_all_records()), use_container_width=True)
-        except: st.write("Aba Historico não encontrada ou vazia.")
+elif menu == "📊 Histórico":
+    st.title("📊 Histórico de Estoque")
+    st.dataframe(pd.DataFrame(sheet_hist_est.get_all_records()), use_container_width=True)
