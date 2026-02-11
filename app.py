@@ -10,7 +10,7 @@ import time
 # ==========================================
 # ⚙️ CONFIGURAÇÃO E ESTILO
 # ==========================================
-st.set_page_config(page_title="Adega do Barão v21", page_icon="🍷", layout="wide")
+st.set_page_config(page_title="Adega do Barão v22", page_icon="🍷", layout="wide")
 
 st.markdown("""
     <style>
@@ -58,11 +58,8 @@ except:
     st.error("Erro na conexão com as planilhas.")
     st.stop()
 
-# --- 🧮 FUNÇÕES DE CORREÇÃO (FORÇAR PONTO) ---
+# --- 🧮 FUNÇÕES ---
 def converter_input_para_numero(valor):
-    """
-    Lê o que você digitou (3,99 ou 3.99) e transforma em número real.
-    """
     if not valor: return 0.0
     v = str(valor).replace("R$", "").replace(" ", "").strip()
     if "," in v:
@@ -72,11 +69,10 @@ def converter_input_para_numero(valor):
     except: return 0.0
 
 def salvar_com_ponto(valor):
-    """
-    O SEGREDO: Pega o número e transforma em texto COM PONTO.
-    Ex: 3.99 vira "3.99" (String) para a planilha aceitar.
-    """
     return "{:.2f}".format(valor)
+
+def para_real_visual(valor):
+    return f"R$ {valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
 def limpar_tel(t): return re.sub(r'\D', '', str(t))
 
@@ -102,40 +98,58 @@ with st.sidebar:
     menu = st.radio("Menu:", ["💰 Caixa", "📦 Estoque", "👥 Clientes", "📊 Históricos"])
 
 # ==========================================
-# 📦 MÓDULO ESTOQUE (COM PONTO E UNIDADE)
+# 📦 MÓDULO ESTOQUE (COMPLETO)
 # ==========================================
 if menu == "📦 Estoque":
     st.title("📦 Gestão de Estoque")
     df_est = pd.DataFrame(sheet_estoque.get_all_records())
     
-    t1, t2, t3 = st.tabs(["📋 Lista Estoque", "🆕 Cadastrar Novo", "✏️ Editar/Excluir"])
+    t1, t2, t3 = st.tabs(["📋 Lista & Lucros", "🆕 Cadastrar Novo", "✏️ Editar/Excluir"])
 
-    # --- TAB 1: VISUALIZAÇÃO ---
+    # --- TAB 1: VISUALIZAÇÃO & LUCRO ---
     if not df_est.empty:
         with t1:
+            # Cálculos para a tabela
+            df_est['custo_n'] = df_est['Custo'].apply(converter_input_para_numero)
+            df_est['venda_n'] = df_est['Venda'].apply(converter_input_para_numero)
+            df_est['Lucro Un.'] = df_est['venda_n'] - df_est['custo_n']
+            
+            # Formatação Visual
+            df_est['Custo (R$)'] = df_est['custo_n'].apply(para_real_visual)
+            df_est['Venda (R$)'] = df_est['venda_n'].apply(para_real_visual)
+            df_est['Lucro (R$)'] = df_est['Lucro Un.'].apply(para_real_visual)
+
             def formatar_estoque(row):
                 total = int(converter_input_para_numero(row['Estoque']))
                 ref = int(converter_input_para_numero(row.get('Qtd_Fardo', 12)))
                 if ref == 0: ref = 12
                 f, u = divmod(total, ref)
-                
                 txt = ""
                 if f > 0: txt += f"📦 {f} fardos "
                 if u > 0: txt += f"🍺 {u} un"
                 return txt if txt else "Zerado"
 
             df_est['Físico'] = df_est.apply(formatar_estoque, axis=1)
-            st.dataframe(df_est[['Nome', 'Físico', 'Venda', 'Estoque', 'Fornecedor', 'Data Compra']], use_container_width=True)
+            
+            # Exibe tabela com Tipo e Lucro
+            st.dataframe(
+                df_est[['Nome', 'Tipo', 'Físico', 'Custo (R$)', 'Venda (R$)', 'Lucro (R$)']], 
+                use_container_width=True
+            )
 
-    # --- TAB 2: CADASTRO NOVO (COM UNIDADE) ---
+    # --- TAB 2: CADASTRO NOVO (COM TIPO) ---
     with t2:
         st.subheader("Cadastrar Produto")
         with st.form("novo_prod"):
             n_nome = st.text_input("Nome do Produto:").upper()
             
+            # SELEÇÃO DO TIPO DE PRODUTO
+            st.write("📌 **Tipo de Produto:**")
+            n_tipo = st.selectbox("Selecione:", ["LATA", "LONG NECK",  "OUTROS"])
+            
             c1, c2 = st.columns(2)
-            n_custo = c1.text_input("Custo Unitário (R$):", placeholder="3.06")
-            n_venda = c2.text_input("Venda Unitária (R$):", placeholder="4.99")
+            n_custo = c1.text_input("Quanto pagou na UNIDADE? (R$):", placeholder="Ex: 3.06")
+            n_venda = c2.text_input("Por quanto vai VENDER? (R$):", placeholder="Ex: 4.99")
             
             c3, c4 = st.columns(2)
             n_forn = c3.text_input("Fornecedor:")
@@ -143,11 +157,10 @@ if menu == "📦 Estoque":
             
             st.divider()
             st.write("📦 **Como você comprou?**")
-            tipo_compra = st.radio("Selecione:", ["Fardo Fechado", "Unidades Soltas"], horizontal=True)
+            tipo_compra = st.radio("Formato da Compra:", ["Fardo Fechado", "Unidades Soltas"], horizontal=True)
             
             col_a, col_b = st.columns(2)
-            # Referência do fardo é sempre necessária para o cálculo visual, mesmo comprando unidade
-            n_ref = col_a.number_input("Quantas vêm no Fardo Padrão?", value=12, help="Usado para calcular quantos fardos você tem")
+            n_ref = col_a.number_input("Quantas vêm no Fardo Padrão?", value=12)
             
             qtd_inicial = 0
             if tipo_compra == "Fardo Fechado":
@@ -158,14 +171,13 @@ if menu == "📦 Estoque":
                 qtd_inicial = qtd_unidades
             
             if st.form_submit_button("✅ CADASTRAR PRODUTO"):
-                # Converte para float primeiro
                 custo_float = converter_input_para_numero(n_custo)
                 venda_float = converter_input_para_numero(n_venda)
                 
-                # Salva na planilha COM PONTO (String)
+                # Salva com o TIPO selecionado (Coluna B)
                 sheet_estoque.append_row([
                     n_nome, 
-                    "Geral", 
+                    n_tipo,  # Agora salva o tipo real
                     n_forn, 
                     salvar_com_ponto(custo_float), 
                     salvar_com_ponto(venda_float), 
@@ -174,14 +186,12 @@ if menu == "📦 Estoque":
                     n_ref
                 ])
                 
-                # Histórico
                 sheet_hist_est.append_row([datetime.now().strftime('%d/%m/%Y %H:%M'), n_nome, "NOVO CADASTRO", qtd_inicial, n_forn])
-                
-                st.success(f"Produto cadastrado! Total: {qtd_inicial} unidades.")
+                st.success(f"Produto {n_nome} ({n_tipo}) cadastrado!")
                 time.sleep(1)
                 st.rerun()
 
-    # --- TAB 3: EDIÇÃO ---
+    # --- TAB 3: EDIÇÃO (COM TIPO) ---
     with t3:
         if not df_est.empty:
             sel_e = st.selectbox("Selecione para editar:", ["Selecione..."] + df_est['Nome'].tolist())
@@ -192,47 +202,48 @@ if menu == "📦 Estoque":
                 with st.form("edit_est_form"):
                     st.info(f"Editando: {sel_e}")
                     
-                    c_a, c_b = st.columns(2)
-                    v_venda = c_a.text_input("Preço Venda:", value=str(row['Venda']))
-                    v_custo = c_b.text_input("Preço Custo:", value=str(row['Custo']))
-                    
-                    c_c, c_d = st.columns(2)
-                    v_forn = c_c.text_input("Fornecedor:", value=str(row.get('Fornecedor', '')))
-                    # Tenta ler a data
-                    try: d_atual = datetime.strptime(row.get('Data Compra', ''), '%d/%m/%Y').date()
-                    except: d_atual = date.today()
-                    v_data = c_d.date_input("Data Compra:", value=d_atual)
+                    # EDIÇÃO DO TIPO
+                    tipos_disponiveis = ["LATA", "LONG NECK", "GARRAFA 600ML", "LITRÃO", "OUTROS"]
+                    tipo_atual = row.get('Tipo', 'LATA')
+                    # Tenta achar o índice do tipo atual, senão usa 0
+                    idx_tipo = tipos_disponiveis.index(tipo_atual) if tipo_atual in tipos_disponiveis else 0
+                    novo_tipo = st.selectbox("Tipo de Embalagem:", tipos_disponiveis, index=idx_tipo)
 
+                    c_a, c_b = st.columns(2)
+                    v_venda = c_a.text_input("Preço Venda (un):", value=str(row['Venda']))
+                    v_custo = c_b.text_input("Preço Custo (un):", value=str(row['Custo']))
+                    
                     st.write("---")
-                    st.write("➕ **Adicionar Estoque (Soma ao atual):**")
+                    st.write("📦 **Adicionar Estoque (Soma):**")
                     f1, f2 = st.columns(2)
                     add_f = f1.number_input("Add Fardos:", min_value=0, step=1, value=0)
                     add_u = f2.number_input("Add Unidades:", min_value=0, step=1, value=0)
                     
+                    # DADOS FORNECEDOR/DATA
+                    v_forn = st.text_input("Fornecedor:", value=str(row.get('Fornecedor', '')))
+                    
                     b_salvar, b_excluir = st.columns(2)
                     
                     if b_salvar.form_submit_button("💾 SALVAR MUDANÇAS"):
-                        # Cálculos
                         ref = int(converter_input_para_numero(row.get('Qtd_Fardo', 12)))
                         est_atual = int(converter_input_para_numero(row['Estoque']))
-                        
                         adicional = (add_f * ref) + add_u
                         total_final = est_atual + adicional
                         
-                        # Salva COM PONTO
                         custo_str = salvar_com_ponto(converter_input_para_numero(v_custo))
                         venda_str = salvar_com_ponto(converter_input_para_numero(v_venda))
                         
+                        # ATUALIZA PLANILHA (Coluna 2 é o Tipo)
+                        sheet_estoque.update_cell(idx+2, 2, novo_tipo) # Atualiza Tipo
                         sheet_estoque.update_cell(idx+2, 3, v_forn)
                         sheet_estoque.update_cell(idx+2, 4, custo_str)
                         sheet_estoque.update_cell(idx+2, 5, venda_str)
                         sheet_estoque.update_cell(idx+2, 6, total_final)
-                        sheet_estoque.update_cell(idx+2, 7, v_data.strftime('%d/%m/%Y'))
                         
                         if adicional > 0:
                             sheet_hist_est.append_row([datetime.now().strftime('%d/%m/%Y %H:%M'), sel_e, "ENTRADA", adicional, f"Forn: {v_forn}"])
                             
-                        st.success(f"Atualizado! Novo Total: {total_final}")
+                        st.success("Produto Atualizado!")
                         time.sleep(1); st.rerun()
                     
                     if b_excluir.form_submit_button("🗑️ EXCLUIR PRODUTO", type="primary"):
@@ -272,13 +283,11 @@ elif menu == "💰 Caixa":
                 tl = limpar_tel(t_c)
                 if p_sel != "(Apenas Ponto)":
                     idx = df_est[df_est['Nome'] == p_sel].index[0]
-                    # Usa .get para evitar KeyError se a coluna Qtd_Fardo sumir
                     ref = int(converter_input_para_numero(df_est.iloc[idx].get('Qtd_Fardo', 12)))
                     baixa = (v_f * ref) + v_u
                     atual = int(converter_input_para_numero(df_est.iloc[idx]['Estoque']))
                     sheet_estoque.update_cell(idx+2, 6, atual - baixa)
                     
-                    # Log da Venda
                     vlr = converter_input_para_numero(df_est.iloc[idx]['Venda'])
                     tot_rs = baixa * vlr
                     sheet_hist_est.append_row([datetime.now().strftime('%d/%m/%Y %H:%M'), p_sel, "VENDA", baixa, salvar_com_ponto(tot_rs)])
