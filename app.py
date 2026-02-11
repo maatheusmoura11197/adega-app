@@ -10,7 +10,7 @@ import time
 # ==========================================
 # ⚙️ CONFIGURAÇÃO E ESTILO
 # ==========================================
-st.set_page_config(page_title="Adega do Barão v23", page_icon="🍷", layout="wide")
+st.set_page_config(page_title="Adega do Barão v24", page_icon="🍷", layout="wide")
 
 st.markdown("""
     <style>
@@ -39,7 +39,7 @@ st.markdown("""
         text-align: center; font-weight: bold; font-size: 22px; margin-top: 10px;
         text-decoration: none; display: block;
     }
-    /* Info Box do Estoque no Caixa */
+    /* Alerta de Estoque no Caixa */
     .estoque-info {
         padding: 15px; background-color: #e3f2fd; border-left: 5px solid #2196f3;
         border-radius: 5px; color: #0d47a1; font-weight: bold; margin-bottom: 10px;
@@ -110,7 +110,7 @@ with st.sidebar:
     menu = st.radio("Menu:", ["💰 Caixa", "📦 Estoque", "👥 Clientes", "📊 Históricos"])
 
 # ==========================================
-# 📦 MÓDULO ESTOQUE (COMPLETO)
+# 📦 MÓDULO ESTOQUE (COM TRAVAS DE SEGURANÇA)
 # ==========================================
 if menu == "📦 Estoque":
     st.title("📦 Gestão de Estoque")
@@ -118,48 +118,42 @@ if menu == "📦 Estoque":
     
     t1, t2, t3 = st.tabs(["📋 Lista Detalhada", "🆕 Cadastrar Novo", "✏️ Editar/Excluir"])
 
-    # --- TAB 1: VISUALIZAÇÃO & LUCRO ---
+    # --- TAB 1: VISUALIZAÇÃO ---
     if not df_est.empty:
         with t1:
-            # Cálculos
             df_est['custo_n'] = df_est['Custo'].apply(converter_input_para_numero)
             df_est['venda_n'] = df_est['Venda'].apply(converter_input_para_numero)
             df_est['Lucro Un.'] = df_est['venda_n'] - df_est['custo_n']
             
-            # Formatação Visual
             df_est['Custo (R$)'] = df_est['custo_n'].apply(para_real_visual)
             df_est['Venda (R$)'] = df_est['venda_n'].apply(para_real_visual)
             df_est['Lucro (R$)'] = df_est['Lucro Un.'].apply(para_real_visual)
 
-            # Estoque Visual
             df_est['Físico'] = df_est.apply(lambda row: calcular_estoque_fisico(int(converter_input_para_numero(row['Estoque'])), int(converter_input_para_numero(row.get('Qtd_Fardo', 12)))), axis=1)
             
-            # Tratamento de colunas novas (caso não existam no começo)
             if 'ML' not in df_est.columns: df_est['ML'] = "-"
             
-            # Exibe tabela COMPLETA
             st.dataframe(
                 df_est[['Nome', 'Tipo', 'ML', 'Físico', 'Custo (R$)', 'Venda (R$)', 'Lucro (R$)', 'Fornecedor', 'Data Compra']], 
                 use_container_width=True
             )
 
-    # --- TAB 2: CADASTRO NOVO ---
+    # --- TAB 2: CADASTRO NOVO (OBRIGATÓRIO) ---
     with t2:
         st.subheader("Cadastrar Produto")
         with st.form("novo_prod"):
-            n_nome = st.text_input("Nome do Produto:").upper()
+            n_nome = st.text_input("Nome do Produto (Obrigatório):").upper()
             
             col_t1, col_t2 = st.columns(2)
             n_tipo = col_t1.selectbox("Tipo:", ["LATA", "LONG NECK", "GARRAFA 600ML", "LITRÃO", "OUTROS"])
-            # OPÇÃO DE ML (9)
             n_ml = col_t2.selectbox("Volume (ML):", ["200ml", "210ml", "269ml", "300ml", "330ml", "350ml", "473ml", "550ml", "600ml", "950ml", "1 Litro", "Outros"])
             
             c1, c2 = st.columns(2)
-            n_custo = c1.text_input("Custo Unitário (R$):", placeholder="3.06")
-            n_venda = c2.text_input("Venda Unitária (R$):", placeholder="4.99")
+            n_custo = c1.text_input("Custo Unitário R$ (Obrigatório):", placeholder="3.06")
+            n_venda = c2.text_input("Venda Unitária R$ (Obrigatório):", placeholder="4.99")
             
             c3, c4 = st.columns(2)
-            n_forn = c3.text_input("Fornecedor:")
+            n_forn = c3.text_input("Fornecedor (Obrigatório):")
             n_data = c4.date_input("Data da Compra", date.today())
             
             st.divider()
@@ -177,17 +171,27 @@ if menu == "📦 Estoque":
                 qtd_inicial = q_u
             
             if st.form_submit_button("✅ CADASTRAR"):
-                # Salva: Nome, Tipo, Fornecedor, Custo, Venda, Estoque, Data, QtdFardo, ML
-                sheet_estoque.append_row([
-                    n_nome, n_tipo, n_forn, 
-                    salvar_com_ponto(converter_input_para_numero(n_custo)), 
-                    salvar_com_ponto(converter_input_para_numero(n_venda)), 
-                    qtd_inicial, n_data.strftime('%d/%m/%Y'), n_ref, n_ml
-                ])
-                sheet_hist_est.append_row([datetime.now().strftime('%d/%m/%Y %H:%M'), n_nome, "NOVO", qtd_inicial, n_forn])
-                st.success("Cadastrado!"); time.sleep(1); st.rerun()
+                # --- VALIDAÇÃO DE CAMPOS OBRIGATÓRIOS ---
+                erro = False
+                if not n_nome: st.error("⚠️ O Nome do Produto é obrigatório!"); erro = True
+                if not n_custo: st.error("⚠️ O Preço de Custo é obrigatório!"); erro = True
+                if not n_venda: st.error("⚠️ O Preço de Venda é obrigatório!"); erro = True
+                if not n_forn: st.error("⚠️ O Fornecedor é obrigatório!"); erro = True
+                
+                if not erro:
+                    custo_float = converter_input_para_numero(n_custo)
+                    venda_float = converter_input_para_numero(n_venda)
+                    
+                    sheet_estoque.append_row([
+                        n_nome, n_tipo, n_forn, 
+                        salvar_com_ponto(custo_float), 
+                        salvar_com_ponto(venda_float), 
+                        qtd_inicial, n_data.strftime('%d/%m/%Y'), n_ref, n_ml
+                    ])
+                    sheet_hist_est.append_row([datetime.now().strftime('%d/%m/%Y %H:%M'), n_nome, "NOVO", qtd_inicial, n_forn])
+                    st.success("Cadastrado com sucesso!"); time.sleep(1); st.rerun()
 
-    # --- TAB 3: EDIÇÃO ---
+    # --- TAB 3: EDIÇÃO (COM ML E VALIDAÇÃO) ---
     with t3:
         if not df_est.empty:
             sel_e = st.selectbox("Editar:", ["Selecione..."] + df_est['Nome'].tolist())
@@ -197,9 +201,25 @@ if menu == "📦 Estoque":
                 
                 with st.form("edit_est_form"):
                     st.info(f"Editando: {sel_e}")
+                    
+                    # TIPOS E ML (Novidade: ML na edição)
+                    c_tipo, c_ml = st.columns(2)
+                    
+                    # Tipo
+                    list_tipos = ["LATA", "LONG NECK", "GARRAFA 600ML", "LITRÃO", "OUTROS"]
+                    idx_t = list_tipos.index(row.get('Tipo', 'LATA')) if row.get('Tipo', 'LATA') in list_tipos else 0
+                    novo_tipo = c_tipo.selectbox("Tipo:", list_tipos, index=idx_t)
+                    
+                    # ML (Lê o atual ou define padrão)
+                    list_ml = ["200ml", "210ml", "269ml", "300ml", "330ml", "350ml", "473ml", "550ml", "600ml", "950ml", "1 Litro", "Outros"]
+                    ml_atual = str(row.get('ML', '350ml'))
+                    idx_ml = list_ml.index(ml_atual) if ml_atual in list_ml else 5
+                    novo_ml = c_ml.selectbox("Volume (ML):", list_ml, index=idx_ml)
+
+                    # PREÇOS
                     c_a, c_b = st.columns(2)
-                    v_venda = c_a.text_input("Venda:", value=str(row['Venda']))
-                    v_custo = c_b.text_input("Custo:", value=str(row['Custo']))
+                    v_venda = c_a.text_input("Venda (R$):", value=str(row['Venda']))
+                    v_custo = c_b.text_input("Custo (R$):", value=str(row['Custo']))
                     v_forn = st.text_input("Fornecedor:", value=str(row.get('Fornecedor', '')))
                     
                     st.write("---")
@@ -210,25 +230,37 @@ if menu == "📦 Estoque":
                     
                     b_sal, b_exc = st.columns(2)
                     if b_sal.form_submit_button("💾 SALVAR"):
-                        ref = int(converter_input_para_numero(row.get('Qtd_Fardo', 12)))
-                        est_atual = int(converter_input_para_numero(row['Estoque']))
-                        novo_tot = est_atual + (add_f * ref) + add_u
+                        # --- VALIDAÇÃO NA EDIÇÃO ---
+                        erro_ed = False
+                        if not v_venda: st.error("Preço de Venda não pode ficar vazio!"); erro_ed = True
+                        if not v_custo: st.error("Preço de Custo não pode ficar vazio!"); erro_ed = True
                         
-                        sheet_estoque.update_cell(idx+2, 3, v_forn)
-                        sheet_estoque.update_cell(idx+2, 4, salvar_com_ponto(converter_input_para_numero(v_custo)))
-                        sheet_estoque.update_cell(idx+2, 5, salvar_com_ponto(converter_input_para_numero(v_venda)))
-                        sheet_estoque.update_cell(idx+2, 6, novo_tot)
-                        sheet_estoque.update_cell(idx+2, 7, date.today().strftime('%d/%m/%Y')) # Atualiza data da compra
-                        
-                        if (add_f * ref) + add_u > 0:
-                            sheet_hist_est.append_row([datetime.now().strftime('%d/%m/%Y %H:%M'), sel_e, "ENTRADA", (add_f * ref) + add_u, f"Forn: {v_forn}"])
-                        st.success("Atualizado!"); time.sleep(1); st.rerun()
+                        if not erro_ed:
+                            ref = int(converter_input_para_numero(row.get('Qtd_Fardo', 12)))
+                            est_atual = int(converter_input_para_numero(row['Estoque']))
+                            novo_tot = est_atual + (add_f * ref) + add_u
+                            
+                            # Atualiza colunas (Índices fixos baseados na ordem de criação)
+                            # 1:Nome, 2:Tipo, 3:Forn, 4:Custo, 5:Venda, 6:Estoque, 7:Data, 8:Ref, 9:ML
+                            sheet_estoque.update_cell(idx+2, 2, novo_tipo)
+                            sheet_estoque.update_cell(idx+2, 3, v_forn)
+                            sheet_estoque.update_cell(idx+2, 4, salvar_com_ponto(converter_input_para_numero(v_custo)))
+                            sheet_estoque.update_cell(idx+2, 5, salvar_com_ponto(converter_input_para_numero(v_venda)))
+                            sheet_estoque.update_cell(idx+2, 6, novo_tot)
+                            sheet_estoque.update_cell(idx+2, 7, date.today().strftime('%d/%m/%Y'))
+                            # Tenta atualizar ML (coluna 9), se der erro (coluna nao existe) ignora
+                            try: sheet_estoque.update_cell(idx+2, 9, novo_ml)
+                            except: pass 
+                            
+                            if (add_f * ref) + add_u > 0:
+                                sheet_hist_est.append_row([datetime.now().strftime('%d/%m/%Y %H:%M'), sel_e, "ENTRADA", (add_f * ref) + add_u, f"Forn: {v_forn}"])
+                            st.success("Atualizado!"); time.sleep(1); st.rerun()
                     
                     if b_exc.form_submit_button("🗑️ EXCLUIR", type="primary"):
                         sheet_estoque.delete_rows(int(idx + 2)); st.warning("Excluído!"); time.sleep(1); st.rerun()
 
 # ==========================================
-# 💰 CAIXA (COM VISUALIZAÇÃO DE ESTOQUE)
+# 💰 CAIXA
 # ==========================================
 elif menu == "💰 Caixa":
     st.title("💰 Caixa & Fidelidade")
@@ -253,7 +285,6 @@ elif menu == "💰 Caixa":
         if not df_est.empty:
             p_sel = st.selectbox("Produto:", ["(Selecione...)"] + df_est['Nome'].tolist())
             
-            # --- MOSTRA ESTOQUE ATUAL ANTES DA VENDA ---
             if p_sel != "(Selecione...)":
                 idx_p = df_est[df_est['Nome'] == p_sel].index[0]
                 row_p = df_est.iloc[idx_p]
@@ -263,8 +294,7 @@ elif menu == "💰 Caixa":
                 )
                 st.markdown(f"""
                 <div class="estoque-info">
-                    📊 ESTOQUE ATUAL DE {p_sel}:<br>
-                    {estoque_txt}
+                    📊 EM ESTOQUE: {estoque_txt}
                 </div>
                 """, unsafe_allow_html=True)
 
@@ -294,7 +324,7 @@ elif menu == "💰 Caixa":
                 
                 sheet_hist_cli.append_row([datetime.now().strftime('%d/%m/%Y %H:%M'), n_c, tl, pts])
                 msg, btn = gerar_mensagem_amigavel(n_c, pts)
-                st.session_state.l_zap = f"https://api.whatsapp.com/send?phone=55{tl}&text={urllib.parse.quote(msg)}"
+                st.session_state.l_zap = f"https://api.whatsapp.com/send?phone=55{tel_l}&text={urllib.parse.quote(msg)}"
                 st.session_state.b_txt = btn; st.session_state.v_suc = True; st.rerun()
 
 # ==========================================
