@@ -2,23 +2,30 @@ import streamlit as st
 import pandas as pd
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
-import urllib.parse 
-import re 
+import urllib.parse
+import re
 from datetime import datetime
-import pytz 
-import time 
+import pytz
+import time
 
-# --- CONFIGURAÇÃO INICIAL ---
-st.set_page_config(page_title="Sistema Integrado Adega", page_icon="🍷", layout="wide")
+# ==========================================
+# ⚙️ CONFIGURAÇÃO INICIAL (CORREÇÃO AQUI)
+# ==========================================
+st.set_page_config(
+    page_title="Sistema Integrado Adega",
+    page_icon="🍷",
+    layout="wide",
+    initial_sidebar_state="expanded"  # <--- ISSO FORÇA O MENU A COMEÇAR ABERTO
+)
 
-# --- BLOQUEIO VISUAL ---
+# --- BLOQUEIO VISUAL SUAVE ---
+# Removemos o bloqueio do 'header' para o menu aparecer no celular e PC
 hide_streamlit_style = """
             <style>
-            #MainMenu {visibility: hidden;} 
+            #MainMenu {visibility: visible;} 
             footer {visibility: hidden;} 
-            header {visibility: hidden;} 
-            .stAppHeader {display: none;} 
             
+            /* Animação do Brinde */
             @keyframes bounce {
                 0% { transform: scale(1); }
                 50% { transform: scale(1.2); }
@@ -35,10 +42,10 @@ hide_streamlit_style = """
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 
 # ==========================================
-# 🔐 LOGIN (MANTIDO DO TEU CÓDIGO)
+# 🔐 LOGIN
 # ==========================================
 SENHA_DO_SISTEMA = "adega123" 
-TEMPO_LIMITE_MINUTOS = 60 # Aumentei um pouco para gestão
+TEMPO_LIMITE_MINUTOS = 60
 
 if 'logado' not in st.session_state: st.session_state.logado = False
 if 'validando' not in st.session_state: st.session_state.validando = False
@@ -60,7 +67,7 @@ if not st.session_state.logado:
     if st.session_state.validando:
         st.markdown("<br><br><br>", unsafe_allow_html=True)
         st.markdown('<div class="brinde">🍷</div>', unsafe_allow_html=True)
-        st.markdown("<h3 style='text-align: center;'>Acessando Sistema Integrado...</h3>", unsafe_allow_html=True)
+        st.markdown("<h3 style='text-align: center;'>Abrindo Sistema Integrado...</h3>", unsafe_allow_html=True)
         time.sleep(1.5)
         st.session_state.logado = True
         st.session_state.validando = False
@@ -81,7 +88,7 @@ if not st.session_state.logado:
 if not verificar_sessao(): st.stop()
 
 # ==========================================
-# 📡 CONEXÃO GOOGLE SHEETS (4 ABAS AGORA)
+# 📡 CONEXÃO GOOGLE SHEETS
 # ==========================================
 try:
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
@@ -94,13 +101,13 @@ try:
     # Conecta nas 4 abas
     sheet_clientes = planilha.worksheet("Página1") 
     sheet_hist_cli = planilha.worksheet("Historico")
-    sheet_estoque = planilha.worksheet("Estoque") # NOVA
-    sheet_hist_est = planilha.worksheet("Historico_Estoque") # NOVA
+    sheet_estoque = planilha.worksheet("Estoque") 
+    sheet_hist_est = planilha.worksheet("Historico_Estoque")
     
     conexao = True
 except Exception as e:
     st.error(f"❌ Erro na conexão com Google Sheets: {e}")
-    st.info("Verifique se criou as abas 'Estoque' e 'Historico_Estoque' na planilha.")
+    st.info("⚠️ Verifique se criou as abas 'Estoque' e 'Historico_Estoque' na sua planilha.")
     st.stop()
 
 # --- FUNÇÕES ÚTEIS GERAIS ---
@@ -111,13 +118,14 @@ def converter_valor(v):
     except: return 0.0
 
 # ==========================================
-# 📱 MENU LATERAL (A ALMA DO SISTEMA)
+# 📱 MENU LATERAL (AGORA VISÍVEL)
 # ==========================================
 with st.sidebar:
-    st.title("🍷 Menu")
+    st.title("🍷 Menu Principal")
+    st.info("Navegue abaixo:")
     menu = st.radio("Ir para:", ["💰 Fidelidade & Caixa", "📦 Gestão de Estoque", "📊 Relatórios"])
     st.markdown("---")
-    if st.button("Sair"):
+    if st.button("Sair do Sistema"):
         st.session_state.logado = False
         st.rerun()
 
@@ -130,8 +138,11 @@ if menu == "📦 Gestão de Estoque":
     aba_cad, aba_ver = st.tabs(["📝 Cadastrar Compra", "📋 Ver Estoque"])
     
     # --- CARREGAR ESTOQUE ---
-    dados_estoque = sheet_estoque.get_all_records()
-    df_estoque = pd.DataFrame(dados_estoque)
+    try:
+        dados_estoque = sheet_estoque.get_all_records()
+        df_estoque = pd.DataFrame(dados_estoque)
+    except:
+        df_estoque = pd.DataFrame()
     
     with aba_cad:
         st.subheader("Entrada de Mercadoria")
@@ -162,20 +173,21 @@ if menu == "📦 Gestão de Estoque":
                     if not df_estoque.empty:
                         for i, row in df_estoque.iterrows():
                             if row['Nome'] == nome_prod:
-                                # Atualiza Existente
+                                # Atualiza Existente (Soma estoque e atualiza preços)
                                 nova_qtd = int(row['Estoque']) + qtd
                                 sheet_estoque.update_cell(idx_planilha + i, 6, nova_qtd) # Coluna 6 = Estoque
                                 sheet_estoque.update_cell(idx_planilha + i, 4, custo)    # Coluna 4 = Custo
                                 sheet_estoque.update_cell(idx_planilha + i, 5, venda)    # Coluna 5 = Venda
+                                sheet_estoque.update_cell(idx_planilha + i, 3, fornecedor) # Col 3 = Fornecedor
                                 encontrado = True
                                 break
                     
                     if not encontrado:
-                        # Cria Novo
+                        # Cria Novo (Ordem: Nome | Tipo | Fornecedor | Custo | Venda | Estoque | Data)
                         sheet_estoque.append_row([nome_prod, tipo_prod, fornecedor, custo, venda, qtd, pegar_data_hora()])
                     
                     # Log no Historico
-                    sheet_hist_est.append_row([pegar_data_hora(), nome_prod, "COMPRA", qtd, custo*qtd, fornecedor])
+                    sheet_hist_est.append_row([pegar_data_hora(), nome_prod, "COMPRA", qtd, custo*qtd, f"Fornecedor: {fornecedor}"])
                     
                     st.success(f"✅ {qtd}x {nome_prod} adicionado com sucesso!")
                     time.sleep(1)
@@ -189,14 +201,14 @@ if menu == "📦 Gestão de Estoque":
             # Filtro
             busca = st.text_input("🔍 Buscar Produto:").upper()
             if busca:
-                df_estoque = df_estoque[df_estoque['Nome'].str.contains(busca)]
+                df_estoque = df_estoque[df_estoque['Nome'].str.contains(busca, case=False)]
             
             st.dataframe(df_estoque, use_container_width=True)
         else:
             st.info("Estoque vazio.")
 
 # ==========================================
-# 💰 MÓDULO 2: FIDELIDADE & CAIXA (A MÁGICA)
+# 💰 MÓDULO 2: FIDELIDADE & CAIXA
 # ==========================================
 elif menu == "💰 Fidelidade & Caixa":
     st.title("💰 Caixa & Fidelidade")
@@ -208,16 +220,16 @@ elif menu == "💰 Fidelidade & Caixa":
     dados_estoque = sheet_estoque.get_all_records()
     df_estoque = pd.DataFrame(dados_estoque)
     
-    # Lista de produtos para venda (Nome + Preço)
+    # Lista de produtos para venda
     if not df_estoque.empty:
-        # Cria uma lista bonita: "SKOL LATA - R$ 3.50 (Estoque: 10)"
+        # Cria uma lista bonita para o selectbox
         df_estoque['Display'] = df_estoque.apply(lambda x: f"{x['Nome']} - R$ {x['Venda']} ({x['Estoque']} un)", axis=1)
         lista_venda = ["Selecione o produto..."] + df_estoque['Display'].tolist()
     else:
         lista_venda = ["Estoque Vazio"]
 
-    # --- FORMULÁRIO DE ATENDIMENTO ---
-    st.markdown("### 👤 Identificar Cliente")
+    # --- IDENTIFICAR CLIENTE ---
+    st.markdown("### 👤 Cliente")
     col_nome_cli, col_tel_cli = st.columns(2)
     
     nome_input = col_nome_cli.text_input("Nome (Primeiro nome)").strip().upper()
@@ -225,7 +237,7 @@ elif menu == "💰 Fidelidade & Caixa":
     
     tel_limpo = limpar_telefone("+55" + tel_input) if tel_input else ""
     
-    # --- O QUE O CLIENTE LEVOU? (A BAIXA DO ESTOQUE) ---
+    # --- CARRINHO / BAIXA ---
     st.markdown("### 🛒 O que ele comprou?")
     produto_selecionado_str = st.selectbox("Selecione o Item para dar baixa:", lista_venda)
     qtd_venda = st.number_input("Quantidade:", min_value=1, value=1)
@@ -234,52 +246,50 @@ elif menu == "💰 Fidelidade & Caixa":
     if st.button("✅ Confirmar Venda & Pontuar", type="primary"):
         erro = False
         
-        # 1. Validações
+        # Validações
         if not nome_input or len(tel_input) < 8:
-            st.warning("Preencha Nome e Telefone do cliente.")
+            st.warning("⚠️ Preencha Nome e Telefone do cliente.")
             erro = True
         
-        if produto_selecionado_str == "Selecione o produto..." or produto_selecionado_str == "Estoque Vazio":
-            st.warning("Selecione um produto do estoque.")
+        if "Selecione" in produto_selecionado_str or "Vazio" in produto_selecionado_str:
+            st.warning("⚠️ Selecione um produto do estoque.")
             erro = True
             
-        # 2. Processar se não houver erro
         if not erro:
-            with st.spinner("Processando Venda e Pontos..."):
+            with st.spinner("Processando Venda..."):
                 
-                # --- PARTE A: BAIXA NO ESTOQUE ---
-                # Descobrir qual produto é (pelo nome)
+                # --- A: BAIXA NO ESTOQUE ---
                 nome_produto_real = produto_selecionado_str.split(" - R$")[0]
                 
-                # Achar linha na planilha de estoque
                 idx_estoque = -1
                 estoque_atual = 0
                 preco_venda = 0
                 
+                # Procura o produto no DataFrame
                 for i, row in df_estoque.iterrows():
                     if row['Nome'] == nome_produto_real:
-                        idx_estoque = i + 2 # +2 por causa do header e index 0
+                        idx_estoque = i + 2 
                         estoque_atual = int(row['Estoque'])
                         preco_venda = float(row['Venda'])
                         break
                 
                 if idx_estoque != -1:
                     if estoque_atual >= qtd_venda:
-                        # Atualiza Estoque na Nuvem
+                        # Baixa na Planilha
                         nova_qtd_est = estoque_atual - qtd_venda
                         sheet_estoque.update_cell(idx_estoque, 6, nova_qtd_est)
                         
-                        # Log Histórico Estoque
+                        # Histórico Estoque
                         total_rs = preco_venda * qtd_venda
                         sheet_hist_est.append_row([pegar_data_hora(), nome_produto_real, "VENDA", qtd_venda, total_rs, f"Cliente: {nome_input}"])
                     else:
-                        st.error(f"Estoque insuficiente! Você tem {estoque_atual}, tentou vender {qtd_venda}.")
+                        st.error(f"🚫 Estoque insuficiente! Tem: {estoque_atual}, Pedido: {qtd_venda}.")
                         st.stop()
                 else:
-                    st.error("Erro ao encontrar produto no estoque.")
+                    st.error("Erro ao encontrar produto.")
                     st.stop()
 
-                # --- PARTE B: PONTUAR CLIENTE (FIDELIDADE) ---
+                # --- B: PONTUAR CLIENTE ---
                 cliente_encontrado = False
                 linha_cliente = -1
                 pontos_atuais = 0
@@ -293,23 +303,20 @@ elif menu == "💰 Fidelidade & Caixa":
                         pontos_atuais = int(match.iloc[0]['compras'])
                 
                 if cliente_encontrado:
-                    # Atualiza Cliente Existente
-                    novos_pontos = pontos_atuais + 1 # Aqui conta visitas/compras. Se quiser somar qtd produtos, troque 1 por qtd_venda
-                    sheet_clientes.update_cell(linha_cliente, 1, nome_input) # Atualiza nome caso tenha mudado
+                    novos_pontos = pontos_atuais + 1 
+                    sheet_clientes.update_cell(linha_cliente, 1, nome_input)
                     sheet_clientes.update_cell(linha_cliente, 3, novos_pontos)
                     sheet_clientes.update_cell(linha_cliente, 4, pegar_data_hora())
                     msg_acao = f"Compra: {nome_produto_real} ({novos_pontos}º pt)"
                 else:
-                    # Novo Cliente
                     novos_pontos = 1
                     sheet_clientes.append_row([nome_input, tel_limpo, 1, pegar_data_hora()])
                     msg_acao = f"Cadastro + Compra: {nome_produto_real}"
                 
-                # Log Histórico Cliente
+                # Histórico Cliente
                 sheet_hist_cli.append_row([pegar_data_hora(), nome_input, tel_limpo, msg_acao])
                 
-                # --- PARTE C: FINALIZAÇÃO ---
-                # Gerar Link WhatsApp
+                # --- C: ZAP E FIM ---
                 if novos_pontos < 10:
                     msg_zap = f"Olá {nome_input}! Obrigado pela compra na Adega! 🍷\nVocê comprou: {nome_produto_real}.\nSeu Saldo Fidelidade: {novos_pontos}/10 pontos."
                 else:
@@ -318,10 +325,10 @@ elif menu == "💰 Fidelidade & Caixa":
                 
                 link_zap = f"https://api.whatsapp.com/send?phone={tel_limpo}&text={urllib.parse.quote(msg_zap)}"
                 
-                st.success(f"✅ Venda Realizada! Estoque de {nome_produto_real} atualizado e Ponto adicionado.")
-                st.markdown(f"[📲 Enviar Comprovante no WhatsApp]({link_zap})")
+                st.success(f"✅ Venda Realizada! {nome_produto_real} baixado do estoque.")
+                st.markdown(f"### [📲 Enviar WhatsApp para Cliente]({link_zap})")
                 
-                time.sleep(3) # Tempo para ler
+                time.sleep(4) 
                 st.rerun()
 
 # ==========================================
@@ -336,11 +343,11 @@ elif menu == "📊 Relatórios":
         try:
             dados_he = sheet_hist_est.get_all_records()
             st.dataframe(pd.DataFrame(dados_he), use_container_width=True)
-        except: st.info("Sem dados.")
+        except: st.info("Sem dados de estoque.")
         
     with col2:
         st.subheader("Histórico de Fidelidade (Clientes)")
         try:
             dados_hc = sheet_hist_cli.get_all_records()
             st.dataframe(pd.DataFrame(dados_hc), use_container_width=True)
-        except: st.info("Sem dados.")
+        except: st.info("Sem dados de clientes.")
