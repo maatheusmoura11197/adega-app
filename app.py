@@ -12,7 +12,7 @@ import time
 # ⚙️ CONFIGURAÇÃO INICIAL
 # ==========================================
 st.set_page_config(
-    page_title="Super Adega 6.0",
+    page_title="Super Adega 7.0",
     page_icon="🍷",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -52,7 +52,6 @@ TEMPO_LIMITE_MINUTOS = 60
 if 'logado' not in st.session_state: st.session_state.logado = False
 if 'validando' not in st.session_state: st.session_state.validando = False
 if 'ultima_atividade' not in st.session_state: st.session_state.ultima_atividade = time.time()
-# ESTADO PARA MANTER O ZAP NA TELA
 if 'venda_sucesso' not in st.session_state: st.session_state.venda_sucesso = False
 if 'link_zap_atual' not in st.session_state: st.session_state.link_zap_atual = ""
 if 'msg_zap_btn' not in st.session_state: st.session_state.msg_zap_btn = ""
@@ -113,40 +112,28 @@ def limpar_telefone(tel): return re.sub(r'\D', '', str(tel))
 def pegar_data_hora(): return datetime.now(pytz.timezone('America/Sao_Paulo')).strftime('%d/%m/%Y %H:%M')
 
 def forcar_numero(valor):
-    """
-    Transforma qualquer bagunça (R$ 1.200,50 / 1,20 / '10') em float puro (1200.50 / 1.2 / 10.0)
-    Essencial para o cálculo não ficar exorbitante.
-    """
-    if isinstance(valor, (int, float)):
-        return float(valor)
-    
-    val_str = str(valor).strip()
-    # Remove R$ e espaços
-    val_str = val_str.replace("R$", "").replace(" ", "")
-    
-    # Se tiver vírgula, assume que é decimal brasileiro
-    if "," in val_str:
-        val_str = val_str.replace(".", "") # Tira ponto de milhar
-        val_str = val_str.replace(",", ".") # Troca virgula por ponto
-    
-    try:
-        return float(val_str)
-    except:
-        return 0.0
+    if isinstance(valor, (int, float)): return float(valor)
+    val_str = str(valor).strip().replace("R$", "").replace(" ", "")
+    if "," in val_str: val_str = val_str.replace(".", "").replace(",", ".")
+    try: return float(val_str)
+    except: return 0.0
 
-def gerar_mensagem_zap(nome, total, prod):
-    if total == 1: 
-        msg = f"Olá {nome}! Bem-vindo à Adega! 🍷\nRegistro: {prod}.\nPontos: 1."
+def formatar_moeda(v): return f"R$ {v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+# --- SUA MENSAGEM PERSONALIZADA (RESTAURADA) ---
+def gerar_mensagem_zap(nome_cliente, total_compras):
+    if total_compras == 1:
+        msg = f"Olá {nome_cliente}! Bem-vindo à Adega! 🍷\nStatus: 1 ponto."
         btn = "Enviar Boas-Vindas 🎉"
-    elif total < 9: 
-        msg = f"Olá {nome}! Registro: {prod}.\nSaldo: {total}/10 pontos."
-        btn = f"Enviar Saldo ({total}/10) 📲"
-    elif total == 9: 
-        msg = f"UAU {nome}! Falta 1 para o prémio! 😱"
-        btn = "🚨 AVISAR (FALTA 1)"
+    elif total_compras < 9:
+        msg = f"Olá {nome_cliente}! Mais uma compra!\nStatus: {total_compras}/10 pontos."
+        btn = f"Enviar Saldo ({total_compras}/10) 📲"
+    elif total_compras == 9:
+        msg = f"UAU {nome_cliente}! Falta 1 para o prémio! 😱"
+        btn = "🚨 AVISAR URGENTE (FALTA 1)"
     else: 
-        msg = f"PARABÉNS {nome}! Ganhou PRÊMIO! 🏆"
-        btn = "🏆 ENVIAR PRÊMIO"
+        msg = f"PARABÉNS {nome_cliente}! Ganhou 50% OFF! 🏆"
+        btn = "🏆 ENVIAR PRÉMIO AGORA"
     return msg, btn
 
 # ==========================================
@@ -168,19 +155,16 @@ with st.sidebar:
 if menu == "📦 Gestão de Estoque":
     st.title("📦 Controle de Estoque")
     
-    # ADICIONEI A ABA DE EDIÇÃO AQUI
-    aba_cad, aba_edit, aba_ver = st.tabs(["📝 Entrada (Compra)", "✏️ Editar Item", "📋 Ver Estoque"])
+    aba_cad, aba_edit, aba_ver = st.tabs(["📝 Entrada (Compra)", "✏️ Editar/Excluir Item", "📋 Ver Estoque"])
     
-    # Carrega dados
     try:
         dados_raw = sheet_estoque.get_all_records()
         df_estoque = pd.DataFrame(dados_raw)
     except: df_estoque = pd.DataFrame()
     
-    # --- ABA 1: CADASTRO / ENTRADA ---
+    # --- ABA 1: ENTRADA ---
     with aba_cad:
         st.subheader("Registrar Compra")
-        
         lista_nomes = df_estoque['Nome'].unique().tolist() if not df_estoque.empty else []
         modo_cadastro = st.radio("Produto:", ["Selecionar Existente", "Cadastrar Novo"], horizontal=True)
         
@@ -191,19 +175,16 @@ if menu == "📦 Gestão de Estoque":
             if lista_nomes:
                 nome_selecionado = st.selectbox("Escolha o Item:", lista_nomes)
                 nome_final = nome_selecionado
-                # Pega ref do fardo
                 item_dados = df_estoque[df_estoque['Nome'] == nome_selecionado].iloc[0]
                 try: qtd_fardo_ref = int(forcar_numero(item_dados['Qtd_Fardo']))
                 except: qtd_fardo_ref = 12
-            else:
-                st.warning("Estoque vazio.")
+            else: st.warning("Estoque vazio.")
         else:
             nome_digitado = st.text_input("Nome do Novo Produto:", placeholder="Ex: Skol Lata").upper()
             tipo = st.selectbox("Tipo:", ["Lata", "Long Neck", "Garrafa 600ml", "Litro/Outros"])
             nome_final = f"{nome_digitado} ({tipo})" if nome_digitado else ""
             
         st.divider()
-        
         col_forma, col_vals = st.columns([1, 2])
         
         with col_forma:
@@ -220,7 +201,6 @@ if menu == "📦 Gestão de Estoque":
                 custo_fardo = st.number_input("Valor pago no FARDO (R$)", min_value=0.0, format="%.2f")
                 qtd_dentro = st.selectbox("Quantas vêm no fardo?", list(range(1, 25)), index=11)
                 qtd_fardos_compra = st.number_input("Quantos FARDOS comprou?", min_value=0, step=1)
-                
                 if qtd_dentro > 0:
                     custo_unitario_novo = custo_fardo / qtd_dentro
                     qtd_total_adicionada = qtd_fardos_compra * qtd_dentro
@@ -236,26 +216,18 @@ if menu == "📦 Gestão de Estoque":
 
         if st.button("💾 Salvar Estoque", type="primary"):
             if nome_final and qtd_total_adicionada > 0:
-                with st.spinner("Calculando..."):
+                with st.spinner("Salvando..."):
                     encontrado = False
                     idx_planilha = 2
-                    
                     if not df_estoque.empty:
                         for i, row in df_estoque.iterrows():
                             if row['Nome'] == nome_final:
-                                # FORÇA NÚMEROS LIMPOS
                                 estoque_antigo = int(forcar_numero(row['Estoque']))
                                 custo_antigo = forcar_numero(row['Custo'])
-                                
-                                # Custo Médio Ponderado
                                 valor_antigo = estoque_antigo * custo_antigo
                                 valor_novo = qtd_total_adicionada * custo_unitario_novo
                                 novo_total = estoque_antigo + qtd_total_adicionada
-                                
-                                if novo_total > 0:
-                                    novo_custo = (valor_antigo + valor_novo) / novo_total
-                                else:
-                                    novo_custo = custo_unitario_novo
+                                novo_custo = (valor_antigo + valor_novo) / novo_total if novo_total > 0 else custo_unitario_novo
                                 
                                 sheet_estoque.update_cell(idx_planilha + i, 6, novo_total)
                                 sheet_estoque.update_cell(idx_planilha + i, 4, novo_custo)
@@ -264,30 +236,24 @@ if menu == "📦 Gestão de Estoque":
                                 sheet_estoque.update_cell(idx_planilha + i, 7, data_compra.strftime('%d/%m/%Y'))
                                 try: sheet_estoque.update_cell(idx_planilha + i, 8, qtd_fardo_ref)
                                 except: pass
-                                
                                 encontrado = True
                                 break
-                    
                     if not encontrado:
-                        # Nome|Tipo|Forn|Custo|Venda|Estoque|Data|QtdFardo
                         sheet_estoque.append_row([nome_final, "Geral", fornecedor, custo_unitario_novo, preco_venda, qtd_total_adicionada, data_compra.strftime('%d/%m/%Y'), qtd_fardo_ref])
                     
                     sheet_hist_est.append_row([pegar_data_hora(), nome_final, "COMPRA", qtd_total_adicionada, f"R$ {qtd_total_adicionada*custo_unitario_novo:.2f}", f"Forn: {fornecedor}"])
-                    
                     st.success(f"✅ {qtd_total_adicionada}x {nome_final} adicionados.")
                     time.sleep(1.5)
                     st.rerun()
-            else:
-                st.error("Preencha corretamente.")
+            else: st.error("Preencha corretamente.")
 
-    # --- ABA 2: EDIÇÃO (NOVA FUNCIONALIDADE) ---
+    # --- ABA 2: EDITAR E EXCLUIR ITEM ---
     with aba_edit:
-        st.subheader("✏️ Editar Produto Existente")
+        st.subheader("✏️ Editar ou Excluir Produto")
         if not df_estoque.empty:
-            prod_edit = st.selectbox("Selecione para corrigir:", ["Selecione..."] + df_estoque['Nome'].unique().tolist())
+            prod_edit = st.selectbox("Selecione para alterar:", ["Selecione..."] + df_estoque['Nome'].unique().tolist())
             
             if prod_edit != "Selecione...":
-                # Busca dados atuais
                 idx_edit = df_estoque[df_estoque['Nome'] == prod_edit].index[0]
                 row_edit = df_estoque.iloc[idx_edit]
                 linha_sheet = idx_edit + 2
@@ -295,8 +261,6 @@ if menu == "📦 Gestão de Estoque":
                 with st.form("form_edit_estoque"):
                     st.info(f"Editando: {prod_edit}")
                     c1, c2, c3 = st.columns(3)
-                    
-                    # Carrega valores forçando numero para nao dar erro no input
                     val_venda_atual = forcar_numero(row_edit['Venda'])
                     val_custo_atual = forcar_numero(row_edit['Custo'])
                     val_estoque_atual = int(forcar_numero(row_edit['Estoque']))
@@ -305,15 +269,22 @@ if menu == "📦 Gestão de Estoque":
                     novo_custo = c2.number_input("Custo Médio (R$)", value=val_custo_atual, format="%.2f")
                     novo_estoque = c3.number_input("Estoque Real (Qtd)", value=val_estoque_atual, step=1)
                     
-                    if st.form_submit_button("💾 Salvar Correção"):
+                    col_save, col_del = st.columns(2)
+                    if col_save.form_submit_button("💾 Salvar Correção"):
                         sheet_estoque.update_cell(linha_sheet, 5, novo_venda)
                         sheet_estoque.update_cell(linha_sheet, 4, novo_custo)
                         sheet_estoque.update_cell(linha_sheet, 6, novo_estoque)
                         st.success("Dados corrigidos!")
                         time.sleep(1)
                         st.rerun()
-        else:
-            st.warning("Sem produtos para editar.")
+                    
+                    # BOTÃO DE EXCLUIR ITEM DO ESTOQUE
+                    if col_del.form_submit_button("🗑️ EXCLUIR ITEM DO ESTOQUE", type="primary"):
+                        sheet_estoque.delete_rows(int(linha_sheet))
+                        st.warning(f"Produto {prod_edit} excluído do sistema.")
+                        time.sleep(1.5)
+                        st.rerun()
+        else: st.warning("Sem produtos.")
 
     # --- ABA 3: VER ESTOQUE ---
     with aba_ver:
@@ -322,31 +293,28 @@ if menu == "📦 Gestão de Estoque":
             if busca: df_estoque = df_estoque[df_estoque['Nome'].str.contains(busca, case=False)]
             
             df_display = df_estoque.copy()
-            
-            # Converte tudo para número puro para fazer conta
             df_display['Custo'] = df_display['Custo'].apply(forcar_numero)
             df_display['Venda'] = df_display['Venda'].apply(forcar_numero)
             df_display['Lucro Un.'] = df_display['Venda'] - df_display['Custo']
             
-            # Lógica Visual
+            df_display['Custo Médio'] = df_display['Custo'].apply(formatar_moeda)
+            df_display['Preço Venda'] = df_display['Venda'].apply(formatar_moeda)
+            df_display['Lucro Real'] = df_display['Lucro Un.'].apply(formatar_moeda)
+            
             if 'Qtd_Fardo' in df_display.columns:
                 df_display['Visual Estoque'] = df_display.apply(lambda x: f"{int(forcar_numero(x['Estoque'])//(forcar_numero(x['Qtd_Fardo']) or 12))} Fardos + {int(forcar_numero(x['Estoque'])%(forcar_numero(x['Qtd_Fardo']) or 12))} Un", axis=1)
-            else:
-                df_display['Visual Estoque'] = df_display['Estoque']
+            else: df_display['Visual Estoque'] = df_display['Estoque']
 
-            # Colunas Finais (Configurando exibição monetária)
             st.dataframe(
                 df_display[['Nome', 'Visual Estoque', 'Venda', 'Custo', 'Lucro Un.']],
-                use_container_width=True,
-                hide_index=True,
+                use_container_width=True, hide_index=True,
                 column_config={
                     "Venda": st.column_config.NumberColumn("Venda", format="R$ %.2f"),
                     "Custo": st.column_config.NumberColumn("Custo Médio", format="R$ %.2f"),
                     "Lucro Un.": st.column_config.NumberColumn("Lucro Real", format="R$ %.2f"),
                 }
             )
-        else:
-            st.info("Estoque vazio.")
+        else: st.info("Estoque vazio.")
 
 # ==========================================
 # 💰 FIDELIDADE & CAIXA
@@ -354,18 +322,10 @@ if menu == "📦 Gestão de Estoque":
 elif menu == "💰 Fidelidade & Caixa":
     st.title("💰 Caixa & Fidelidade")
     
-    # SE VENDA JÁ FOI FEITA, MOSTRA TELA DE SUCESSO E BOTÃO ZAP
     if st.session_state.venda_sucesso:
         st.balloons()
         st.success("✅ VENDA REGISTRADA COM SUCESSO!")
-        
-        # LINK GRANDE
-        st.markdown(f"""
-        <a href="{st.session_state.link_zap_atual}" target="_blank" class="big-btn">
-            📱 {st.session_state.msg_zap_btn}
-        </a>
-        """, unsafe_allow_html=True)
-        
+        st.markdown(f"""<a href="{st.session_state.link_zap_atual}" target="_blank" class="big-btn">📱 {st.session_state.msg_zap_btn}</a>""", unsafe_allow_html=True)
         st.divider()
         if st.button("🔄 INICIAR NOVA VENDA (LIMPAR TELA)", type="primary"):
             st.session_state.venda_sucesso = False
@@ -374,11 +334,9 @@ elif menu == "💰 Fidelidade & Caixa":
             st.rerun()
             
     else:
-        # TELA DE VENDA NORMAL
         df_clientes = pd.DataFrame(sheet_clientes.get_all_records())
         df_estoque = pd.DataFrame(sheet_estoque.get_all_records())
         
-        # 1. IDENTIFICAÇÃO
         st.markdown("### 👤 Quem é o cliente?")
         lista_clientes_display = ["🆕 NOVO CLIENTE"]
         dict_clientes = {}
@@ -391,7 +349,6 @@ elif menu == "💰 Fidelidade & Caixa":
                 dict_clientes[row['Display']] = row['telefone']
                 
         cliente_selecionado = st.selectbox("Selecione ou Cadastre:", lista_clientes_display)
-        
         col_nome, col_tel = st.columns(2)
         is_new_client = False
         
@@ -406,21 +363,15 @@ elif menu == "💰 Fidelidade & Caixa":
             tel_input = col_tel.text_input("Telefone:", value=dados_tel, disabled=True)
             
         tel_input_limpo = limpar_telefone(tel_input)
-
         st.divider()
 
-        # 2. CARRINHO
         st.markdown("### 🛒 O que ele está levando?")
-        
         if not df_estoque.empty:
             df_estoque['Menu'] = df_estoque.apply(lambda x: f"{x['Nome']} (Estoque: {x['Estoque']})", axis=1)
             lista_prod = ["(Apenas Pontuar - Sem Produto)"] + df_estoque['Menu'].tolist()
             prod_escolhido_menu = st.selectbox("Produto:", lista_prod)
             
-            if prod_escolhido_menu != "(Apenas Pontuar - Sem Produto)":
-                nome_produto_real = prod_escolhido_menu.split(" (Estoque:")[0]
-            else:
-                nome_produto_real = "(Apenas Pontuar - Sem Produto)"
+            nome_produto_real = prod_escolhido_menu.split(" (Estoque:")[0] if prod_escolhido_menu != "(Apenas Pontuar - Sem Produto)" else "(Apenas Pontuar - Sem Produto)"
 
             st.write("Quantidade:")
             c_fardo, c_unid = st.columns(2)
@@ -434,37 +385,29 @@ elif menu == "💰 Fidelidade & Caixa":
                 except: tamanho_fardo_real = 12
                 
             total_unidades_venda = (qtd_fardos_venda * tamanho_fardo_real) + qtd_soltas_venda
-            
-            if total_unidades_venda > 0:
-                st.info(f"🧾 Baixando: **{total_unidades_venda} garrafas** de {nome_produto_real}")
+            if total_unidades_venda > 0: st.info(f"🧾 Baixando: **{total_unidades_venda} garrafas** de {nome_produto_real}")
         else:
             st.warning("Estoque vazio.")
             nome_produto_real = "(Apenas Pontuar - Sem Produto)"
             total_unidades_venda = 0
 
         st.divider()
-
-        # 3. BOTÃO DE AÇÃO
         if st.button("✅ CONFIRMAR VENDA", type="primary"):
             erro = False
-            if not nome_input: 
-                st.error("Falta o nome do cliente."); erro = True
+            if not nome_input: st.error("Falta o nome do cliente."); erro = True
             
             if not erro:
                 with st.spinner("Processando..."):
-                    
-                    # A: BAIXA DE ESTOQUE
+                    # BAIXA ESTOQUE
                     if nome_produto_real != "(Apenas Pontuar - Sem Produto)" and total_unidades_venda > 0:
                         idx_est = -1
                         est_atual = 0
-                        
                         for i, r in df_estoque.iterrows():
                             if r['Nome'] == nome_produto_real:
                                 idx_est = i + 2
                                 est_atual = int(forcar_numero(r['Estoque']))
                                 venda_val = forcar_numero(r['Venda'])
                                 break
-                        
                         if idx_est != -1:
                             if est_atual >= total_unidades_venda:
                                 sheet_estoque.update_cell(idx_est, 6, est_atual - total_unidades_venda)
@@ -473,15 +416,13 @@ elif menu == "💰 Fidelidade & Caixa":
                             else:
                                 st.error(f"Estoque insuficiente! Tem {est_atual}, tentou vender {total_unidades_venda}.")
                                 st.stop()
-                    
                     elif nome_produto_real != "(Apenas Pontuar - Sem Produto)" and total_unidades_venda == 0:
                         nome_produto_real = f"Visita ({nome_produto_real} - Qtd 0)"
                     
-                    # B: FIDELIDADE
+                    # FIDELIDADE
                     cliente_ja_existe = False
                     row_cli = -1
                     pts_old = 0
-                    
                     if not df_clientes.empty:
                         match = df_clientes[df_clientes['tel_limpo'] == tel_input_limpo]
                         if not match.empty:
@@ -498,12 +439,12 @@ elif menu == "💰 Fidelidade & Caixa":
                         novos_pts = 1
                         sheet_clientes.append_row([nome_input, tel_input, 1, pegar_data_hora()])
                     
-                    # Log e Zap
                     sheet_hist_cli.append_row([pegar_data_hora(), nome_input, tel_input, f"Venda: {nome_produto_real}"])
-                    msg, btn_txt = gerar_mensagem_zap(nome_input, novos_pts, nome_produto_real)
+                    
+                    # CHAMADA CORRIGIDA DA FUNÇÃO DE ZAP (2 ARGUMENTOS)
+                    msg, btn_txt = gerar_mensagem_zap(nome_input, novos_pts)
                     link = f"https://api.whatsapp.com/send?phone={tel_input_limpo}&text={urllib.parse.quote(msg)}"
                     
-                    # SALVA ESTADO NA SESSÃO PARA NÃO SUMIR
                     st.session_state.venda_sucesso = True
                     st.session_state.link_zap_atual = link
                     st.session_state.msg_zap_btn = btn_txt
@@ -540,8 +481,10 @@ elif menu == "👥 Gerenciar Clientes":
                     st.success("Atualizado!")
                     st.rerun()
                 
-                if col_del.form_submit_button("🗑️ EXCLUIR"):
-                    sheet_clientes.delete_rows(linha_sheet_edit)
+                if col_del.form_submit_button("🗑️ EXCLUIR CLIENTE"):
+                    # CORREÇÃO DO ERRO DE EXCLUSÃO (CONVERTENDO PARA INT)
+                    sheet_clientes.delete_rows(int(linha_sheet_edit))
+                    st.warning("Cliente excluído!")
                     st.rerun()
     else: st.warning("Sem dados.")
 
@@ -553,9 +496,9 @@ elif menu == "📊 Relatórios":
     c1, c2 = st.columns(2)
     with c1: 
         st.subheader("Movimentação Estoque")
-        try: st.dataframe(pd.DataFrame(sheet_hist_est.get_all_records()), use_container_width=True)
+        try: st.dataframe(pd.DataFrame(sheet_hist_est.get_all_records()), use_container_width=True, hide_index=True)
         except: st.write("Vazio")
     with c2:
         st.subheader("Histórico Fidelidade")
-        try: st.dataframe(pd.DataFrame(sheet_hist_cli.get_all_records()), use_container_width=True)
+        try: st.dataframe(pd.DataFrame(sheet_hist_cli.get_all_records()), use_container_width=True, hide_index=True)
         except: st.write("Vazio")
