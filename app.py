@@ -48,48 +48,51 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 # ==========================================
-# 🔐 LOGIN (COM ANIMAÇÃO CORRIGIDA)
+# 🔐 LOGIN (LÓGICA DE ANIMAÇÃO BLINDADA)
 # ==========================================
 SENHA_DO_SISTEMA = "adega123"
 
+# Inicializa variáveis de estado
 if 'logado' not in st.session_state: st.session_state.logado = False
+if 'animacao_login' not in st.session_state: st.session_state.animacao_login = False
 
+# --- ETAPA 1: SE NÃO ESTÁ LOGADO ---
 if not st.session_state.logado:
-    # Cria um espaço vazio que vamos preencher ou com o Login ou com o Brinde
-    login_placeholder = st.empty()
-
-    with login_placeholder.container():
-        st.markdown("<br><br><h1 style='text-align: center;'>🔒 Adega do Barão</h1>", unsafe_allow_html=True)
-        st.markdown("<p style='text-align: center;'>Sistema de Gestão e Fidelidade</p>", unsafe_allow_html=True)
+    
+    # Se a animação foi ativada, MOSTRA O BRINDE agora
+    if st.session_state.animacao_login:
+        col_x, col_y, col_z = st.columns([1, 2, 1])
+        with col_y:
+            st.markdown("<br><br>", unsafe_allow_html=True)
+            # GIF de brinde em alta qualidade
+            st.image("https://media.giphy.com/media/t2sKa4JKNW9DawxAYi/giphy.gif", use_container_width=True)
+            st.markdown("<h2 style='text-align: center; color: #0047AB;'>Entrando... 🍻</h2>", unsafe_allow_html=True)
         
+        # Segura a tela por 2.5 segundos para você ver o brinde
+        time.sleep(2.5)
+        
+        # Libera o acesso e recarrega
+        st.session_state.logado = True
+        st.session_state.animacao_login = False # Desliga animação para próximas vezes
+        st.rerun()
+        
+    # Se não, MOSTRA O LOGIN
+    else:
         c_a, c_b, c_c = st.columns([1, 2, 1])
         with c_b:
-            with st.form("login"):
-                senha = st.text_input("Digite a Senha de Acesso:", type="password", placeholder="Digite e aperte Enter ↵")
+            st.markdown("<br><br><h1 style='text-align: center;'>🔒 Adega do Barão</h1>", unsafe_allow_html=True)
+            with st.form("login_form"):
+                senha = st.text_input("Senha de Acesso:", type="password", placeholder="Digite e aperte Enter ↵")
                 submit = st.form_submit_button("ACESSAR SISTEMA")
                 
                 if submit:
                     if senha == SENHA_DO_SISTEMA:
-                        # --- A MÁGICA ACONTECE AQUI ---
-                        # 1. Limpa o formulário de senha da tela
-                        login_placeholder.empty()
-                        
-                        # 2. Mostra o Brinde em tela cheia
-                        col_x, col_y, col_z = st.columns([1, 1, 1])
-                        with col_y:
-                            st.markdown("<br><br>", unsafe_allow_html=True)
-                            st.image("https://media.giphy.com/media/t2sKa4JKNW9DawxAYi/giphy.gif", use_container_width=True)
-                            st.markdown("<h2 style='text-align: center; color: #0047AB;'>Entrando... 🍻</h2>", unsafe_allow_html=True)
-                        
-                        # 3. Espera 2.5 segundos para você curtir a animação
-                        time.sleep(2.5)
-                        
-                        # 4. Libera o sistema
-                        st.session_state.logado = True
+                        # Ativa o modo animação e recarrega a página IMEDIATAMENTE
+                        st.session_state.animacao_login = True
                         st.rerun()
                     else:
                         st.error("🚫 Senha incorreta!")
-    st.stop()
+    st.stop() # Para o código aqui até logar
 
 # ==========================================
 # 📡 CONEXÃO GOOGLE SHEETS
@@ -169,6 +172,7 @@ if menu == "📦 Estoque":
     # --- TAB 1: VISUALIZAÇÃO ---
     if not df_est.empty:
         with t1:
+            # === AUTO-REPARO ===
             if 'ML' not in df_est.columns:
                 if st.button("🔧 Reparar Coluna ML"):
                     try: sheet_estoque.update_cell(1, 9, "ML"); st.rerun()
