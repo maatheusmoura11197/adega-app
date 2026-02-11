@@ -48,7 +48,7 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 # ==========================================
-# 🔐 LOGIN (ESTÁVEL E COM ENTER)
+# 🔐 LOGIN (LINK DA ANIMAÇÃO CORRIGIDO)
 # ==========================================
 SENHA_DO_SISTEMA = "adega123"
 
@@ -59,17 +59,16 @@ if not st.session_state.logado:
     
     c_a, c_b, c_c = st.columns([1, 2, 1])
     with c_b:
-        # st.form GARANTE que o ENTER funcione
         with st.form("login_form"):
             senha = st.text_input("Senha de Acesso:", type="password", placeholder="Digite e aperte Enter ↵")
             submit = st.form_submit_button("ACESSAR SISTEMA")
             
             if submit:
                 if senha == SENHA_DO_SISTEMA:
-                    # MOSTRA O BRINDE DENTRO DO FLUXO SEGURO
                     st.success("Senha Correta! Carregando...")
-                    st.image("https://media.giphy.com/media/t2sKa4JKNW9DawxAYi/giphy.gif", use_container_width=True)
-                    time.sleep(2) # Pausa para ver o brinde
+                    # Link novo e estável (Canecas Brindando)
+                    st.image("https://media1.tenor.com/m/5-2_9lK2mY8AAAAC/cheers-beer.gif", use_container_width=True)
+                    time.sleep(2.5) 
                     st.session_state.logado = True
                     st.rerun()
                 else:
