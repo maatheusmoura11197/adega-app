@@ -10,7 +10,7 @@ import time
 # ==========================================
 # ⚙️ CONFIGURAÇÃO E ESTILO
 # ==========================================
-st.set_page_config(page_title="Adega do Barão - Sistema Oficial", page_icon="🍷", layout="wide")
+st.set_page_config(page_title="Adega do Barão - Sistema Oficial", page_icon="🍺", layout="wide")
 
 st.markdown("""
     <style>
@@ -134,7 +134,7 @@ def calcular_estoque_fisico(total, ref_fardo):
 # 📱 MENU LATERAL
 # ==========================================
 with st.sidebar:
-    st.title("🍷 Menu Principal")
+    st.title("🔧 Menu Principal")
     menu = st.radio("Navegar:", ["💰 Caixa", "📦 Estoque", "👥 Clientes", "📊 Históricos"])
     st.divider()
     if st.button("SAIR (Logout)"):
