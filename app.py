@@ -48,51 +48,33 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 # ==========================================
-# 🔐 LOGIN (LÓGICA DE ANIMAÇÃO BLINDADA)
+# 🔐 LOGIN (ESTÁVEL E COM ENTER)
 # ==========================================
 SENHA_DO_SISTEMA = "adega123"
 
-# Inicializa variáveis de estado
 if 'logado' not in st.session_state: st.session_state.logado = False
-if 'animacao_login' not in st.session_state: st.session_state.animacao_login = False
 
-# --- ETAPA 1: SE NÃO ESTÁ LOGADO ---
 if not st.session_state.logado:
+    st.markdown("<br><br><h1 style='text-align: center;'>🔒 Adega do Barão</h1>", unsafe_allow_html=True)
     
-    # Se a animação foi ativada, MOSTRA O BRINDE agora
-    if st.session_state.animacao_login:
-        col_x, col_y, col_z = st.columns([1, 2, 1])
-        with col_y:
-            st.markdown("<br><br>", unsafe_allow_html=True)
-            # GIF de brinde em alta qualidade
-            st.image("https://media.giphy.com/media/t2sKa4JKNW9DawxAYi/giphy.gif", use_container_width=True)
-            st.markdown("<h2 style='text-align: center; color: #0047AB;'>Entrando... 🍻</h2>", unsafe_allow_html=True)
-        
-        # Segura a tela por 2.5 segundos para você ver o brinde
-        time.sleep(2.5)
-        
-        # Libera o acesso e recarrega
-        st.session_state.logado = True
-        st.session_state.animacao_login = False # Desliga animação para próximas vezes
-        st.rerun()
-        
-    # Se não, MOSTRA O LOGIN
-    else:
-        c_a, c_b, c_c = st.columns([1, 2, 1])
-        with c_b:
-            st.markdown("<br><br><h1 style='text-align: center;'>🔒 Adega do Barão</h1>", unsafe_allow_html=True)
-            with st.form("login_form"):
-                senha = st.text_input("Senha de Acesso:", type="password", placeholder="Digite e aperte Enter ↵")
-                submit = st.form_submit_button("ACESSAR SISTEMA")
-                
-                if submit:
-                    if senha == SENHA_DO_SISTEMA:
-                        # Ativa o modo animação e recarrega a página IMEDIATAMENTE
-                        st.session_state.animacao_login = True
-                        st.rerun()
-                    else:
-                        st.error("🚫 Senha incorreta!")
-    st.stop() # Para o código aqui até logar
+    c_a, c_b, c_c = st.columns([1, 2, 1])
+    with c_b:
+        # st.form GARANTE que o ENTER funcione
+        with st.form("login_form"):
+            senha = st.text_input("Senha de Acesso:", type="password", placeholder="Digite e aperte Enter ↵")
+            submit = st.form_submit_button("ACESSAR SISTEMA")
+            
+            if submit:
+                if senha == SENHA_DO_SISTEMA:
+                    # MOSTRA O BRINDE DENTRO DO FLUXO SEGURO
+                    st.success("Senha Correta! Carregando...")
+                    st.image("https://media.giphy.com/media/t2sKa4JKNW9DawxAYi/giphy.gif", use_container_width=True)
+                    time.sleep(2) # Pausa para ver o brinde
+                    st.session_state.logado = True
+                    st.rerun()
+                else:
+                    st.error("🚫 Senha incorreta!")
+    st.stop()
 
 # ==========================================
 # 📡 CONEXÃO GOOGLE SHEETS
