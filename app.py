@@ -106,7 +106,7 @@ def calcular_estoque_fisico(total, ref_fardo):
 # 📱 MENU LATERAL
 # ==========================================
 with st.sidebar:
-    st.title("🍷 Adega do Barão")
+    st.title("Menu Interativo 🔧")
     menu = st.radio("Menu:", ["💰 Caixa", "📦 Estoque", "👥 Clientes", "📊 Históricos"])
 
 # ==========================================
