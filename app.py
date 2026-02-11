@@ -12,7 +12,7 @@ import time
 # ⚙️ CONFIGURAÇÃO INICIAL
 # ==========================================
 st.set_page_config(
-    page_title="Super Adega 8.0",
+    page_title="Super Adega 9.0",
     page_icon="🍷",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -23,9 +23,6 @@ hide_streamlit_style = """
             <style>
             #MainMenu {visibility: visible;} 
             footer {visibility: hidden;} 
-            .stSelectbox div[data-baseweb="select"] > div:first-child {
-                border-color: #ff4b4b;
-            }
             .big-btn {
                 background-color: #25D366; 
                 color: white; 
@@ -113,24 +110,25 @@ def pegar_data_hora(): return datetime.now(pytz.timezone('America/Sao_Paulo')).s
 def forcar_numero_br(valor):
     """
     CORREÇÃO DE CÁLCULO: Transforma '36,70' em float 36.70 corretamente.
+    Lida com R$, espaços e converte virgula para ponto.
     """
-    if valor is None or valor == "": return 0.0
+    if valor is None or str(valor).strip() == "": return 0.0
     if isinstance(valor, (int, float)): return float(valor)
     
     val_str = str(valor).strip().replace("R$", "").replace(" ", "")
-    # Se tiver virgula e ponto (ex: 1.200,50), tira ponto e troca virgula
-    if "." in val_str and "," in val_str:
+    
+    # Lógica Brasileira:
+    # Se tem virgula (36,70), remove pontos de milhar e troca virgula por ponto
+    if "," in val_str:
         val_str = val_str.replace(".", "").replace(",", ".")
-    # Se só tiver virgula (ex: 36,70), troca por ponto
-    elif "," in val_str:
-        val_str = val_str.replace(",", ".")
-        
+    # Se nao tem virgula, mantem o ponto (36.70)
+    
     try: return float(val_str)
     except: return 0.0
 
 def formatar_moeda(v): return f"R$ {v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
-# --- MENSAGENS WHATSAPP (SEU CÓDIGO ORIGINAL) ---
+# --- MENSAGENS WHATSAPP ---
 def gerar_mensagem_zap(nome_cliente, total_compras):
     if total_compras == 1:
         msg = f"Olá {nome_cliente}! Bem-vindo à Adega! 🍷\nStatus: 1 ponto."
@@ -207,33 +205,40 @@ if menu == "📦 Gestão de Estoque":
             custo_unitario_novo = 0.0
             qtd_total_adicionada = 0
             
-            # CAMPOS LIMPOS (SEM 0.00 PARA APAGAR)
+            # Usamos text_input para aceitar virgula sem travar, depois convertemos
             if forma_compra == "Fardo Fechado":
-                custo_fardo = st.number_input("Valor pago no FARDO (R$)", min_value=0.0, format="%.2f", value=None, placeholder="0,00")
+                custo_fardo_str = st.text_input("Valor pago no FARDO (R$)", placeholder="36,70")
                 qtd_dentro = st.selectbox("Quantas vêm no fardo?", list(range(1, 25)), index=11)
-                qtd_fardos_compra = st.number_input("Quantos FARDOS comprou?", min_value=0, step=1, value=None, placeholder="0")
+                qtd_fardos_compra_str = st.text_input("Quantos FARDOS comprou?", placeholder="10")
                 
-                # CÁLCULO CORRIGIDO: Se digitou 36,70, custo_fardo vira 36.70
-                if custo_fardo and qtd_dentro > 0 and qtd_fardos_compra:
+                custo_fardo = forcar_numero_br(custo_fardo_str)
+                qtd_fardos_compra = forcar_numero_br(qtd_fardos_compra_str)
+
+                if custo_fardo > 0 and qtd_dentro > 0 and qtd_fardos_compra > 0:
                     custo_unitario_novo = custo_fardo / qtd_dentro
-                    qtd_total_adicionada = qtd_fardos_compra * qtd_dentro
+                    qtd_total_adicionada = int(qtd_fardos_compra * qtd_dentro)
                     qtd_fardo_ref = qtd_dentro
             else:
-                custo_unit = st.number_input("Valor pago na UNIDADE (R$)", min_value=0.0, format="%.2f", value=None, placeholder="0,00")
-                qtd_soltas_compra = st.number_input("Quantas UNIDADES comprou?", min_value=0, step=1, value=None, placeholder="0")
+                custo_unit_str = st.text_input("Valor pago na UNIDADE (R$)", placeholder="4,50")
+                qtd_soltas_str = st.text_input("Quantas UNIDADES comprou?", placeholder="50")
                 qtd_fardo_ref = st.selectbox("Tamanho padrão do fardo (Ref):", list(range(1, 25)), index=11)
                 
-                if custo_unit and qtd_soltas_compra:
-                    custo_unitario_novo = custo_unit
-                    qtd_total_adicionada = qtd_soltas_compra
+                custo_unit = forcar_numero_br(custo_unit_str)
+                qtd_soltas_compra = forcar_numero_br(qtd_soltas_str)
 
-            preco_venda = st.number_input("Preço de Venda Unitário (R$)", min_value=0.0, format="%.2f", value=None, placeholder="0,00")
+                if custo_unit > 0 and qtd_soltas_compra > 0:
+                    custo_unitario_novo = custo_unit
+                    qtd_total_adicionada = int(qtd_soltas_compra)
+
+            preco_venda_str = st.text_input("Preço de Venda Unitário (R$)", placeholder="4,49")
+            preco_venda = forcar_numero_br(preco_venda_str)
 
         if st.button("💾 Salvar Estoque", type="primary"):
-            if nome_final and qtd_total_adicionada > 0 and preco_venda:
+            if nome_final and qtd_total_adicionada > 0 and preco_venda > 0:
                 with st.spinner("Calculando..."):
                     encontrado = False
                     idx_planilha = 2
+                    
                     if not df_estoque.empty:
                         for i, row in df_estoque.iterrows():
                             if row['Nome'] == nome_final:
@@ -244,6 +249,7 @@ if menu == "📦 Gestão de Estoque":
                                 valor_novo = qtd_total_adicionada * custo_unitario_novo
                                 novo_total = estoque_antigo + qtd_total_adicionada
                                 
+                                # Custo Médio Ponderado
                                 if novo_total > 0:
                                     novo_custo = (valor_antigo + valor_novo) / novo_total
                                 else:
@@ -258,14 +264,16 @@ if menu == "📦 Gestão de Estoque":
                                 except: pass
                                 encontrado = True
                                 break
+                    
                     if not encontrado:
+                        # Nome|Tipo|Forn|Custo|Venda|Estoque|Data|QtdFardo
                         sheet_estoque.append_row([nome_final, "Geral", fornecedor, custo_unitario_novo, preco_venda, qtd_total_adicionada, data_compra.strftime('%d/%m/%Y'), qtd_fardo_ref])
                     
                     sheet_hist_est.append_row([pegar_data_hora(), nome_final, "COMPRA", qtd_total_adicionada, f"R$ {qtd_total_adicionada*custo_unitario_novo:.2f}", f"Forn: {fornecedor}"])
-                    st.success(f"✅ {qtd_total_adicionada}x {nome_final} adicionados.")
-                    time.sleep(1.5)
+                    st.success(f"✅ {qtd_total_adicionada}x {nome_final} adicionados. Custo Un: R$ {custo_unitario_novo:.2f}")
+                    time.sleep(2)
                     st.rerun()
-            else: st.error("Preencha todos os campos corretamente.")
+            else: st.error("Preencha valores e quantidades corretamente.")
 
     # --- ABA 2: EDITAR E EXCLUIR ITEM ---
     with aba_edit:
