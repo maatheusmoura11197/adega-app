@@ -44,43 +44,51 @@ st.markdown("""
         padding: 15px; background-color: #e3f2fd; border-left: 5px solid #2196f3;
         border-radius: 5px; color: #0d47a1; font-weight: bold; margin-bottom: 10px;
     }
-    /* Centralizar Login */
-    .login-container {
-        display: flex; justify-content: center; align-items: center; flex-direction: column;
-    }
     </style>
     """, unsafe_allow_html=True)
 
 # ==========================================
-# 🔐 LOGIN (COM BRINDE E ENTER)
+# 🔐 LOGIN (COM ANIMAÇÃO CORRIGIDA)
 # ==========================================
 SENHA_DO_SISTEMA = "adega123"
 
 if 'logado' not in st.session_state: st.session_state.logado = False
 
 if not st.session_state.logado:
-    # Centralização Visual
-    col1, col2, col3 = st.columns([1, 1, 1])
-    
-    with col2:
-        st.markdown("<br>", unsafe_allow_html=True)
-        # GIF de Brinde
-        st.image("https://media.giphy.com/media/t2sKa4JKNW9DawxAYi/giphy.gif", use_container_width=True)
-        st.markdown("<h1 style='text-align: center;'>Adega do Barão</h1>", unsafe_allow_html=True)
+    # Cria um espaço vazio que vamos preencher ou com o Login ou com o Brinde
+    login_placeholder = st.empty()
+
+    with login_placeholder.container():
+        st.markdown("<br><br><h1 style='text-align: center;'>🔒 Adega do Barão</h1>", unsafe_allow_html=True)
+        st.markdown("<p style='text-align: center;'>Sistema de Gestão e Fidelidade</p>", unsafe_allow_html=True)
         
-        # O st.form permite usar o ENTER para enviar
-        with st.form("login"):
-            senha = st.text_input("Senha de Acesso:", type="password", placeholder="Digite e aperte Enter ↵")
-            submit = st.form_submit_button("ENTRAR 🍺")
-            
-            if submit:
-                if senha == SENHA_DO_SISTEMA:
-                    with st.spinner("Abrindo o sistema..."):
-                        time.sleep(1.5) # Charme de carregamento
+        c_a, c_b, c_c = st.columns([1, 2, 1])
+        with c_b:
+            with st.form("login"):
+                senha = st.text_input("Digite a Senha de Acesso:", type="password", placeholder="Digite e aperte Enter ↵")
+                submit = st.form_submit_button("ACESSAR SISTEMA")
+                
+                if submit:
+                    if senha == SENHA_DO_SISTEMA:
+                        # --- A MÁGICA ACONTECE AQUI ---
+                        # 1. Limpa o formulário de senha da tela
+                        login_placeholder.empty()
+                        
+                        # 2. Mostra o Brinde em tela cheia
+                        col_x, col_y, col_z = st.columns([1, 1, 1])
+                        with col_y:
+                            st.markdown("<br><br>", unsafe_allow_html=True)
+                            st.image("https://media.giphy.com/media/t2sKa4JKNW9DawxAYi/giphy.gif", use_container_width=True)
+                            st.markdown("<h2 style='text-align: center; color: #0047AB;'>Entrando... 🍻</h2>", unsafe_allow_html=True)
+                        
+                        # 3. Espera 2.5 segundos para você curtir a animação
+                        time.sleep(2.5)
+                        
+                        # 4. Libera o sistema
                         st.session_state.logado = True
                         st.rerun()
-                else:
-                    st.error("🚫 Senha incorreta!")
+                    else:
+                        st.error("🚫 Senha incorreta!")
     st.stop()
 
 # ==========================================
@@ -161,7 +169,6 @@ if menu == "📦 Estoque":
     # --- TAB 1: VISUALIZAÇÃO ---
     if not df_est.empty:
         with t1:
-            # === AUTO-REPARO ===
             if 'ML' not in df_est.columns:
                 if st.button("🔧 Reparar Coluna ML"):
                     try: sheet_estoque.update_cell(1, 9, "ML"); st.rerun()
@@ -373,7 +380,7 @@ elif menu == "💰 Caixa":
                 
                 sheet_hist_cli.append_row([datetime.now().strftime('%d/%m/%Y %H:%M'), n_c, tl, pts])
                 msg, btn = gerar_mensagem_amigavel(n_c, pts)
-                st.session_state.l_zap = f"https://api.whatsapp.com/send?phone=55{tel_l}&text={urllib.parse.quote(msg)}"
+                st.session_state.l_zap = f"https://api.whatsapp.com/send?phone=55{tl}&text={urllib.parse.quote(msg)}"
                 st.session_state.b_txt = btn; st.session_state.v_suc = True; st.rerun()
 
 # ==========================================
