@@ -10,7 +10,7 @@ import time
 # ==========================================
 # ⚙️ CONFIGURAÇÃO E ESTILO
 # ==========================================
-st.set_page_config(page_title="Adega do Barão", page_icon="🍺", layout="wide")
+st.set_page_config(page_title="Adega do Barão - Sistema Oficial", page_icon="🍷", layout="wide")
 
 st.markdown("""
     <style>
@@ -39,13 +39,36 @@ st.markdown("""
         text-align: center; font-weight: bold; font-size: 22px; margin-top: 10px;
         text-decoration: none; display: block;
     }
-    /* Alerta de Estoque no Caixa */
+    /* Alerta de Estoque */
     .estoque-info {
         padding: 15px; background-color: #e3f2fd; border-left: 5px solid #2196f3;
         border-radius: 5px; color: #0d47a1; font-weight: bold; margin-bottom: 10px;
     }
     </style>
     """, unsafe_allow_html=True)
+
+# ==========================================
+# 🔐 LOGIN (ATIVADO)
+# ==========================================
+SENHA_DO_SISTEMA = "adega123"
+
+if 'logado' not in st.session_state: st.session_state.logado = False
+
+if not st.session_state.logado:
+    st.markdown("<br><br><h1 style='text-align: center;'>🔒 Adega do Barão</h1>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align: center;'>Sistema de Gestão e Fidelidade</p>", unsafe_allow_html=True)
+    
+    c_a, c_b, c_c = st.columns([1, 2, 1])
+    with c_b:
+        with st.form("login"):
+            senha = st.text_input("Digite a Senha de Acesso:", type="password")
+            if st.form_submit_button("ACESSAR SISTEMA"):
+                if senha == SENHA_DO_SISTEMA:
+                    st.session_state.logado = True
+                    st.rerun()
+                else:
+                    st.error("🚫 Senha incorreta!")
+    st.stop()
 
 # ==========================================
 # 📡 CONEXÃO GOOGLE SHEETS
@@ -60,7 +83,7 @@ try:
     sheet_hist_est = planilha.worksheet("Historico_Estoque")
     sheet_hist_cli = planilha.worksheet("Historico")
 except:
-    st.error("Erro na conexão com as planilhas.")
+    st.error("Erro crítico de conexão. Verifique sua internet.")
     st.stop()
 
 # --- 🧮 FUNÇÕES ---
@@ -106,11 +129,15 @@ def calcular_estoque_fisico(total, ref_fardo):
 # 📱 MENU LATERAL
 # ==========================================
 with st.sidebar:
-    st.title("Menu Interativo 🔧")
-    menu = st.radio("Menu:", ["💰 Caixa", "📦 Estoque", "👥 Clientes", "📊 Históricos"])
+    st.title("🍷 Menu Principal")
+    menu = st.radio("Navegar:", ["💰 Caixa", "📦 Estoque", "👥 Clientes", "📊 Históricos"])
+    st.divider()
+    if st.button("SAIR (Logout)"):
+        st.session_state.logado = False
+        st.rerun()
 
 # ==========================================
-# 📦 MÓDULO ESTOQUE (COM TRAVAS DE SEGURANÇA)
+# 📦 MÓDULO ESTOQUE
 # ==========================================
 if menu == "📦 Estoque":
     st.title("📦 Gestão de Estoque")
@@ -121,6 +148,12 @@ if menu == "📦 Estoque":
     # --- TAB 1: VISUALIZAÇÃO ---
     if not df_est.empty:
         with t1:
+            if 'ML' not in df_est.columns:
+                st.warning("⚠️ Coluna ML não encontrada.")
+                if st.button("🔧 Reparar Coluna ML"):
+                    try: sheet_estoque.update_cell(1, 9, "ML"); st.rerun()
+                    except: pass
+
             df_est['custo_n'] = df_est['Custo'].apply(converter_input_para_numero)
             df_est['venda_n'] = df_est['Venda'].apply(converter_input_para_numero)
             df_est['Lucro Un.'] = df_est['venda_n'] - df_est['custo_n']
@@ -128,7 +161,6 @@ if menu == "📦 Estoque":
             df_est['Custo (R$)'] = df_est['custo_n'].apply(para_real_visual)
             df_est['Venda (R$)'] = df_est['venda_n'].apply(para_real_visual)
             df_est['Lucro (R$)'] = df_est['Lucro Un.'].apply(para_real_visual)
-
             df_est['Físico'] = df_est.apply(lambda row: calcular_estoque_fisico(int(converter_input_para_numero(row['Estoque'])), int(converter_input_para_numero(row.get('Qtd_Fardo', 12)))), axis=1)
             
             if 'ML' not in df_est.columns: df_est['ML'] = "-"
@@ -138,7 +170,7 @@ if menu == "📦 Estoque":
                 use_container_width=True
             )
 
-    # --- TAB 2: CADASTRO NOVO (OBRIGATÓRIO) ---
+    # --- TAB 2: CADASTRO NOVO ---
     with t2:
         st.subheader("Cadastrar Produto")
         with st.form("novo_prod"):
@@ -146,8 +178,16 @@ if menu == "📦 Estoque":
             
             col_t1, col_t2 = st.columns(2)
             n_tipo = col_t1.selectbox("Tipo:", ["LATA", "LONG NECK", "GARRAFA 600ML", "LITRÃO", "OUTROS"])
-            n_ml = col_t2.selectbox("Volume (ML):", ["200ml", "210ml", "269ml", "300ml", "330ml", "350ml", "473ml", "550ml", "600ml", "950ml", "1 Litro", "Outros"])
             
+            # LÓGICA ML PERSONALIZADO
+            lista_ml = ["200ml", "210ml", "269ml", "300ml", "330ml", "350ml", "473ml", "550ml", "600ml", "950ml", "1 Litro", "Outros"]
+            sel_ml = col_t2.selectbox("Volume (ML):", lista_ml)
+            
+            if sel_ml == "Outros":
+                n_ml = col_t2.text_input("Digite o volume (ex: 750ml):")
+            else:
+                n_ml = sel_ml
+
             c1, c2 = st.columns(2)
             n_custo = c1.text_input("Custo Unitário R$ (Obrigatório):", placeholder="3.06")
             n_venda = c2.text_input("Venda Unitária R$ (Obrigatório):", placeholder="4.99")
@@ -171,27 +211,24 @@ if menu == "📦 Estoque":
                 qtd_inicial = q_u
             
             if st.form_submit_button("✅ CADASTRAR"):
-                # --- VALIDAÇÃO DE CAMPOS OBRIGATÓRIOS ---
                 erro = False
-                if not n_nome: st.error("⚠️ O Nome do Produto é obrigatório!"); erro = True
-                if not n_custo: st.error("⚠️ O Preço de Custo é obrigatório!"); erro = True
-                if not n_venda: st.error("⚠️ O Preço de Venda é obrigatório!"); erro = True
-                if not n_forn: st.error("⚠️ O Fornecedor é obrigatório!"); erro = True
+                if not n_nome: st.error("⚠️ Nome Obrigatório"); erro = True
+                if not n_custo: st.error("⚠️ Custo Obrigatório"); erro = True
+                if not n_venda: st.error("⚠️ Venda Obrigatória"); erro = True
+                if not n_forn: st.error("⚠️ Fornecedor Obrigatório"); erro = True
+                if sel_ml == "Outros" and not n_ml: st.error("⚠️ Digite o ML personalizado"); erro = True
                 
                 if not erro:
-                    custo_float = converter_input_para_numero(n_custo)
-                    venda_float = converter_input_para_numero(n_venda)
-                    
                     sheet_estoque.append_row([
                         n_nome, n_tipo, n_forn, 
-                        salvar_com_ponto(custo_float), 
-                        salvar_com_ponto(venda_float), 
+                        salvar_com_ponto(converter_input_para_numero(n_custo)), 
+                        salvar_com_ponto(converter_input_para_numero(n_venda)), 
                         qtd_inicial, n_data.strftime('%d/%m/%Y'), n_ref, n_ml
                     ])
                     sheet_hist_est.append_row([datetime.now().strftime('%d/%m/%Y %H:%M'), n_nome, "NOVO", qtd_inicial, n_forn])
-                    st.success("Cadastrado com sucesso!"); time.sleep(1); st.rerun()
+                    st.success("Cadastrado com Sucesso!"); time.sleep(1); st.rerun()
 
-    # --- TAB 3: EDIÇÃO (COM ML E VALIDAÇÃO) ---
+    # --- TAB 3: EDIÇÃO ---
     with t3:
         if not df_est.empty:
             sel_e = st.selectbox("Editar:", ["Selecione..."] + df_est['Nome'].tolist())
@@ -202,21 +239,32 @@ if menu == "📦 Estoque":
                 with st.form("edit_est_form"):
                     st.info(f"Editando: {sel_e}")
                     
-                    # TIPOS E ML (Novidade: ML na edição)
                     c_tipo, c_ml = st.columns(2)
-                    
                     # Tipo
                     list_tipos = ["LATA", "LONG NECK", "GARRAFA 600ML", "LITRÃO", "OUTROS"]
-                    idx_t = list_tipos.index(row.get('Tipo', 'LATA')) if row.get('Tipo', 'LATA') in list_tipos else 0
+                    t_atual = row.get('Tipo', 'LATA')
+                    idx_t = list_tipos.index(t_atual) if t_atual in list_tipos else 0
                     novo_tipo = c_tipo.selectbox("Tipo:", list_tipos, index=idx_t)
                     
-                    # ML (Lê o atual ou define padrão)
+                    # LÓGICA ML INTELIGENTE NA EDIÇÃO
                     list_ml = ["200ml", "210ml", "269ml", "300ml", "330ml", "350ml", "473ml", "550ml", "600ml", "950ml", "1 Litro", "Outros"]
-                    ml_atual = str(row.get('ML', '350ml'))
-                    idx_ml = list_ml.index(ml_atual) if ml_atual in list_ml else 5
-                    novo_ml = c_ml.selectbox("Volume (ML):", list_ml, index=idx_ml)
+                    ml_banco = str(row.get('ML', '350ml'))
+                    
+                    # Se o ML do banco não está na lista padrão, seleciona "Outros" automaticamente
+                    if ml_banco in list_ml:
+                        idx_ml = list_ml.index(ml_banco)
+                        sel_ml_edit = c_ml.selectbox("Volume (ML):", list_ml, index=idx_ml)
+                        final_ml = sel_ml_edit
+                    else:
+                        idx_ml = list_ml.index("Outros")
+                        sel_ml_edit = c_ml.selectbox("Volume (ML):", list_ml, index=idx_ml)
+                        final_ml = c_ml.text_input("Digite o volume personalizado:", value=ml_banco)
+                    
+                    # Se o usuário mudar para "Outros" manualmente
+                    if sel_ml_edit == "Outros" and ml_banco in list_ml:
+                         final_ml = c_ml.text_input("Digite o volume personalizado:")
 
-                    # PREÇOS
+                    # Preços e Dados
                     c_a, c_b = st.columns(2)
                     v_venda = c_a.text_input("Venda (R$):", value=str(row['Venda']))
                     v_custo = c_b.text_input("Custo (R$):", value=str(row['Custo']))
@@ -230,31 +278,22 @@ if menu == "📦 Estoque":
                     
                     b_sal, b_exc = st.columns(2)
                     if b_sal.form_submit_button("💾 SALVAR"):
-                        # --- VALIDAÇÃO NA EDIÇÃO ---
-                        erro_ed = False
-                        if not v_venda: st.error("Preço de Venda não pode ficar vazio!"); erro_ed = True
-                        if not v_custo: st.error("Preço de Custo não pode ficar vazio!"); erro_ed = True
+                        ref = int(converter_input_para_numero(row.get('Qtd_Fardo', 12)))
+                        est_atual = int(converter_input_para_numero(row['Estoque']))
+                        novo_tot = est_atual + (add_f * ref) + add_u
                         
-                        if not erro_ed:
-                            ref = int(converter_input_para_numero(row.get('Qtd_Fardo', 12)))
-                            est_atual = int(converter_input_para_numero(row['Estoque']))
-                            novo_tot = est_atual + (add_f * ref) + add_u
-                            
-                            # Atualiza colunas (Índices fixos baseados na ordem de criação)
-                            # 1:Nome, 2:Tipo, 3:Forn, 4:Custo, 5:Venda, 6:Estoque, 7:Data, 8:Ref, 9:ML
-                            sheet_estoque.update_cell(idx+2, 2, novo_tipo)
-                            sheet_estoque.update_cell(idx+2, 3, v_forn)
-                            sheet_estoque.update_cell(idx+2, 4, salvar_com_ponto(converter_input_para_numero(v_custo)))
-                            sheet_estoque.update_cell(idx+2, 5, salvar_com_ponto(converter_input_para_numero(v_venda)))
-                            sheet_estoque.update_cell(idx+2, 6, novo_tot)
-                            sheet_estoque.update_cell(idx+2, 7, date.today().strftime('%d/%m/%Y'))
-                            # Tenta atualizar ML (coluna 9), se der erro (coluna nao existe) ignora
-                            try: sheet_estoque.update_cell(idx+2, 9, novo_ml)
-                            except: pass 
-                            
-                            if (add_f * ref) + add_u > 0:
-                                sheet_hist_est.append_row([datetime.now().strftime('%d/%m/%Y %H:%M'), sel_e, "ENTRADA", (add_f * ref) + add_u, f"Forn: {v_forn}"])
-                            st.success("Atualizado!"); time.sleep(1); st.rerun()
+                        sheet_estoque.update_cell(idx+2, 2, novo_tipo)
+                        sheet_estoque.update_cell(idx+2, 3, v_forn)
+                        sheet_estoque.update_cell(idx+2, 4, salvar_com_ponto(converter_input_para_numero(v_custo)))
+                        sheet_estoque.update_cell(idx+2, 5, salvar_com_ponto(converter_input_para_numero(v_venda)))
+                        sheet_estoque.update_cell(idx+2, 6, novo_tot)
+                        sheet_estoque.update_cell(idx+2, 7, date.today().strftime('%d/%m/%Y'))
+                        try: sheet_estoque.update_cell(idx+2, 9, final_ml)
+                        except: pass
+                        
+                        if (add_f * ref) + add_u > 0:
+                            sheet_hist_est.append_row([datetime.now().strftime('%d/%m/%Y %H:%M'), sel_e, "ENTRADA", (add_f * ref) + add_u, f"Forn: {v_forn}"])
+                        st.success("Atualizado!"); time.sleep(1); st.rerun()
                     
                     if b_exc.form_submit_button("🗑️ EXCLUIR", type="primary"):
                         sheet_estoque.delete_rows(int(idx + 2)); st.warning("Excluído!"); time.sleep(1); st.rerun()
@@ -324,7 +363,7 @@ elif menu == "💰 Caixa":
                 
                 sheet_hist_cli.append_row([datetime.now().strftime('%d/%m/%Y %H:%M'), n_c, tl, pts])
                 msg, btn = gerar_mensagem_amigavel(n_c, pts)
-                st.session_state.l_zap = f"https://api.whatsapp.com/send?phone=55{tel_l}&text={urllib.parse.quote(msg)}"
+                st.session_state.l_zap = f"https://api.whatsapp.com/send?phone=55{tl}&text={urllib.parse.quote(msg)}"
                 st.session_state.b_txt = btn; st.session_state.v_suc = True; st.rerun()
 
 # ==========================================
