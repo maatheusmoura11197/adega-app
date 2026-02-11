@@ -55,7 +55,7 @@ SENHA_DO_SISTEMA = "adega123"
 if 'logado' not in st.session_state: st.session_state.logado = False
 
 if not st.session_state.logado:
-    st.markdown("<br><br><h1 style='text-align: center;'>👩‍💻 Adega do Barão</h1>", unsafe_allow_html=True)
+    st.markdown("<br><br><h1 style='text-align: center;'>🍻😎 Adega do Barão</h1>", unsafe_allow_html=True)
     
     c_a, c_b, c_c = st.columns([1, 2, 1])
     with c_b:
