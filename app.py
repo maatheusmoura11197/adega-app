@@ -10,7 +10,7 @@ import time
 # ==========================================
 # ⚙️ CONFIGURAÇÃO E ESTILO
 # ==========================================
-st.set_page_config(page_title="Adega do Barão v24", page_icon="🍷", layout="wide")
+st.set_page_config(page_title="Adega do Barão", page_icon="🍺", layout="wide")
 
 st.markdown("""
     <style>
@@ -134,7 +134,7 @@ if menu == "📦 Estoque":
             if 'ML' not in df_est.columns: df_est['ML'] = "-"
             
             st.dataframe(
-                df_est[['Nome', 'Tipo', 'ML', 'Físico', 'Custo (R$)', 'Venda (R$)', 'Lucro (R$)', 'Fornecedor', 'Data Compra']], 
+                df_est[['Nome', 'Tipo', 'ML', 'Físico', 'Custo (R$)', 'Venda (R$)', 'Lucro (R$)', 'Fornecedor', 'Data da ultima Compra']], 
                 use_container_width=True
             )
 
@@ -145,8 +145,8 @@ if menu == "📦 Estoque":
             n_nome = st.text_input("Nome do Produto (Obrigatório):").upper()
             
             col_t1, col_t2 = st.columns(2)
-            n_tipo = col_t1.selectbox("Tipo:", ["LATA", "LONG NECK", "GARRAFA 600ML", "LITRÃO", "OUTROS"])
-            n_ml = col_t2.selectbox("Volume (ML):", ["200ml", "210ml", "269ml", "300ml", "330ml", "350ml", "473ml", "550ml", "600ml", "950ml", "1 Litro", "Outros"])
+            n_tipo = col_t1.selectbox("Tipo:", ["LATA", "LONG NECK", "OUTROS"])
+            n_ml = col_t2.selectbox("Volume (ML):", ["200ml", "210ml", "250ml", "269ml", "300ml", "330ml", "350ml", "450ml", "500ml", "550ml", "600ml", "950ml", "1 Litro",])
             
             c1, c2 = st.columns(2)
             n_custo = c1.text_input("Custo Unitário R$ (Obrigatório):", placeholder="3.06")
@@ -206,12 +206,12 @@ if menu == "📦 Estoque":
                     c_tipo, c_ml = st.columns(2)
                     
                     # Tipo
-                    list_tipos = ["LATA", "LONG NECK", "GARRAFA 600ML", "LITRÃO", "OUTROS"]
+                    list_tipos = ["LATA", "LONG NECK", "OUTROS"]
                     idx_t = list_tipos.index(row.get('Tipo', 'LATA')) if row.get('Tipo', 'LATA') in list_tipos else 0
                     novo_tipo = c_tipo.selectbox("Tipo:", list_tipos, index=idx_t)
                     
                     # ML (Lê o atual ou define padrão)
-                    list_ml = ["200ml", "210ml", "269ml", "300ml", "330ml", "350ml", "473ml", "550ml", "600ml", "950ml", "1 Litro", "Outros"]
+                    list_ml = ["200ml", "210ml", "250ml", "269ml", "300ml", "330ml", "350ml", "450ml", "500ml", "550ml", "600ml", "950ml", "1 Litro"]
                     ml_atual = str(row.get('ML', '350ml'))
                     idx_ml = list_ml.index(ml_atual) if ml_atual in list_ml else 5
                     novo_ml = c_ml.selectbox("Volume (ML):", list_ml, index=idx_ml)
