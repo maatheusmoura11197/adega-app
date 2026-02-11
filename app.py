@@ -10,7 +10,7 @@ import time
 # ==========================================
 # ⚙️ CONFIGURAÇÃO E ESTILO
 # ==========================================
-st.set_page_config(page_title="Adega do Barão - Sistema Oficial", page_icon="🍷", layout="wide")
+st.set_page_config(page_title="Adega do Barão - Sistema Oficial", page_icon="🍺", layout="wide")
 
 st.markdown("""
     <style>
@@ -55,7 +55,7 @@ SENHA_DO_SISTEMA = "adega123"
 if 'logado' not in st.session_state: st.session_state.logado = False
 
 if not st.session_state.logado:
-    st.markdown("<br><br><h1 style='text-align: center;'>🔒 Adega do Barão</h1>", unsafe_allow_html=True)
+    st.markdown("<br><br><h1 style='text-align: center;'>👩‍💻 Adega do Barão</h1>", unsafe_allow_html=True)
     
     c_a, c_b, c_c = st.columns([1, 2, 1])
     with c_b:
@@ -118,7 +118,7 @@ def gerar_mensagem_amigavel(nome_cliente, pontos):
         msg = f"E aí, {nome}! 👊\nCompra registrada! Agora você tem *{pontos} pontos*. ✨\nFaltam só {faltam} para o prêmio! Tamo junto! 🍻"
         btn = f"Enviar Saldo ({pontos}/10) 📲"
     else: 
-        msg = f"PARABÉNS, {nome}!!! ✨🏆\nVocê completou 10 pontos e ganhou um **DESCONTO DE 20%** hoje! Aproveite! 🥳🍷"
+        msg = f"PARABÉNS, {nome}!!! ✨🏆\nVocê completou 10 pontos e ganhou um **DESCONTO DE 20%** hoje! Aproveite, o prêmio tem validade de 7 dias! 🥳🍷"
         btn = "🏆 ENVIAR PRÊMIO AGORA!"
     return msg, btn
 
@@ -134,7 +134,7 @@ def calcular_estoque_fisico(total, ref_fardo):
 # 📱 MENU LATERAL
 # ==========================================
 with st.sidebar:
-    st.title("🍷 Menu Principal")
+    st.title("🔧 Menu Principal")
     menu = st.radio("Navegar:", ["💰 Caixa", "📦 Estoque", "👥 Clientes", "📊 Históricos"])
     st.divider()
     if st.button("SAIR (Logout)"):
