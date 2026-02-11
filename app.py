@@ -8,54 +8,59 @@ from datetime import datetime, date
 import time
 
 # ==========================================
-# ⚙️ CONFIGURAÇÃO E ESTILO
+# ⚙️ CONFIGURAÇÃO E ESTILO (ÍCONE NOVO)
 # ==========================================
-st.set_page_config(page_title="Adega do Barão - Sistema Oficial", page_icon="🍺", layout="wide")
+# Link de um ícone profissional (Garrafa e Taça)
+ICON_URL = "https://cdn-icons-png.flaticon.com/512/3175/3175199.png"
 
-st.markdown("""
+st.set_page_config(page_title="Adega do Barão", page_icon=ICON_URL, layout="wide")
+
+st.markdown(f"""
     <style>
     /* Estilo das Abas */
-    .stTabs [data-baseweb="tab-list"] { gap: 10px; }
-    .stTabs [data-baseweb="tab"] {
+    .stTabs [data-baseweb="tab-list"] {{ gap: 10px; }}
+    .stTabs [data-baseweb="tab"] {{
         background-color: #0047AB; /* Azul Royal */
         color: white !important;
         border-radius: 10px 10px 0px 0px;
         padding: 10px 20px;
         font-weight: bold;
-    }
-    .stTabs [aria-selected="true"] {
+    }}
+    .stTabs [aria-selected="true"] {{
         background-color: #002D6E !important; /* Azul Escuro */
-    }
+    }}
     /* Botões */
-    div.stButton > button {
+    div.stButton > button {{
         background-color: #008CBA; color: white; font-weight: bold;
         border-radius: 10px; height: 3em; width: 100%; border: none;
-    }
-    div.stButton > button[kind="primary"] { background-color: #FF0000 !important; }
+    }}
+    div.stButton > button[kind="primary"] {{ background-color: #FF0000 !important; }}
     
     /* WhatsApp */
-    .big-btn {
+    .big-btn {{
         background-color: #25D366; color: white; padding: 20px; border-radius: 15px; 
         text-align: center; font-weight: bold; font-size: 22px; margin-top: 10px;
         text-decoration: none; display: block;
-    }
+    }}
     /* Alerta de Estoque */
-    .estoque-info {
+    .estoque-info {{
         padding: 15px; background-color: #e3f2fd; border-left: 5px solid #2196f3;
         border-radius: 5px; color: #0d47a1; font-weight: bold; margin-bottom: 10px;
-    }
+    }}
     </style>
+    <link rel="shortcut icon" href="{ICON_URL}">
+    <link rel="apple-touch-icon" href="{ICON_URL}">
     """, unsafe_allow_html=True)
 
 # ==========================================
-# 🔐 LOGIN (SIMPLES E EFICIENTE)
+# 🔐 LOGIN
 # ==========================================
 SENHA_DO_SISTEMA = "adega123"
 
 if 'logado' not in st.session_state: st.session_state.logado = False
 
 if not st.session_state.logado:
-    st.markdown("<br><br><h1 style='text-align: center;'>🍻😎 Adega do Barão</h1>", unsafe_allow_html=True)
+    st.markdown("<br><br><h1 style='text-align: center;'>🔒 Adega do Barão</h1>", unsafe_allow_html=True)
     
     c_a, c_b, c_c = st.columns([1, 2, 1])
     with c_b:
@@ -65,12 +70,11 @@ if not st.session_state.logado:
             
             if submit:
                 if senha == SENHA_DO_SISTEMA:
-                    st.success("✅ Senha Correta!")
-                    # Animação nativa de carregamento (Simples e Funcional)
-                    with st.spinner("Acessando Adega..."):
-                        time.sleep(1) 
-                        st.session_state.logado = True
-                        st.rerun()
+                    st.success("Senha Correta! Carregando...")
+                    st.image("https://media1.tenor.com/m/5-2_9lK2mY8AAAAC/cheers-beer.gif", use_container_width=True)
+                    time.sleep(2) 
+                    st.session_state.logado = True
+                    st.rerun()
                 else:
                     st.error("🚫 Senha incorreta!")
     st.stop()
@@ -118,7 +122,7 @@ def gerar_mensagem_amigavel(nome_cliente, pontos):
         msg = f"E aí, {nome}! 👊\nCompra registrada! Agora você tem *{pontos} pontos*. ✨\nFaltam só {faltam} para o prêmio! Tamo junto! 🍻"
         btn = f"Enviar Saldo ({pontos}/10) 📲"
     else: 
-        msg = f"PARABÉNS, {nome}!!! ✨🏆\nVocê completou 10 pontos e ganhou um **DESCONTO DE 20%** hoje! Aproveite, o prêmio tem validade de 7 dias! 🥳🍷"
+        msg = f"PARABÉNS, {nome}!!! ✨🏆\nVocê completou 10 pontos e ganhou um **DESCONTO DE 20%** hoje! Aproveite! 🥳🍷"
         btn = "🏆 ENVIAR PRÊMIO AGORA!"
     return msg, btn
 
@@ -134,7 +138,8 @@ def calcular_estoque_fisico(total, ref_fardo):
 # 📱 MENU LATERAL
 # ==========================================
 with st.sidebar:
-    st.title("🔧 Menu Principal")
+    st.image(ICON_URL, width=100) # Mostra o logo na barra lateral também
+    st.title("Menu Principal")
     menu = st.radio("Navegar:", ["💰 Caixa", "📦 Estoque", "👥 Clientes", "📊 Históricos"])
     st.divider()
     if st.button("SAIR (Logout)"):
@@ -183,7 +188,6 @@ if menu == "📦 Estoque":
         col_t1, col_t2 = st.columns(2)
         n_tipo = col_t1.selectbox("Tipo:", ["LATA", "LONG NECK", "GARRAFA 600ML", "LITRÃO", "OUTROS"])
         
-        # ML DINÂMICO
         lista_ml = ["200ml", "210ml", "269ml", "300ml", "330ml", "350ml", "473ml", "550ml", "600ml", "950ml", "1 Litro", "Outros"]
         sel_ml = col_t2.selectbox("Volume (ML):", lista_ml)
         
