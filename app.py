@@ -21,8 +21,6 @@ st.markdown(f"""
     div.stButton > button {{ background-color: #008CBA; color: white; font-weight: bold; border-radius: 10px; height: 3em; width: 100%; border: none; }}
     div.stButton > button[kind="primary"] {{ background-color: #FF0000 !important; }}
     .estoque-info {{ padding: 15px; background-color: #e3f2fd; border-left: 5px solid #2196f3; border-radius: 5px; color: #0d47a1; font-weight: bold; margin-bottom: 10px; }}
-    .btn-planilha {{ background-color: #25D366; color: white; padding: 12px; border-radius: 10px; text-align: center; font-weight: bold; font-size: 16px; margin-bottom: 20px; text-decoration: none; display: block; border: 2px solid #1DA851; }}
-    .btn-planilha:hover {{ background-color: #1DA851; color: white; }}
     </style>
     <link rel="shortcut icon" href="{ICON_URL}">
     <link rel="apple-touch-icon" href="{ICON_URL}">
@@ -60,6 +58,10 @@ try:
     creds = ServiceAccountCredentials.from_json_keyfile_dict(st.secrets["gcp_service_account"], scope)
     client = gspread.authorize(creds)
     planilha = client.open("Fidelidade")
+    
+    # URL da Planilha (Para o botão)
+    LINK_PLANILHA = f"https://docs.google.com/spreadsheets/d/{planilha.id}/edit"
+
     sheet_clientes = planilha.worksheet("Página1") 
     sheet_estoque = planilha.worksheet("Estoque") 
     sheet_hist_est = planilha.worksheet("Historico_Estoque")
@@ -132,14 +134,21 @@ def gerar_mensagem(nome_cliente, pontos):
     else: return f"PARABÉNS, {nome}!!! ✨🏆\nVocê completou 10 pontos e ganhou um **DESCONTO DE 20%** hoje! Aproveite! 🥳🍷", "🏆 ENVIAR PRÊMIO!"
 
 # ==========================================
-# 📱 MENU
+# 📱 MENU LATERAL (AGORA COM BOTÃO DA PLANILHA)
 # ==========================================
 with st.sidebar:
     st.image(ICON_URL, width=80)
     st.title("🍷 Menu Principal")
     menu = st.radio("Navegar:", ["💰 Caixa", "📦 Estoque", "👥 Clientes", "📊 Históricos"])
+    
     st.divider()
-    if st.button("SAIR (Logout)"):
+    
+    st.write("📊 **Acesso Rápido:**")
+    st.link_button("Ir para Planilha no Google", LINK_PLANILHA, use_container_width=True)
+    
+    st.divider()
+    
+    if st.button("🚪 SAIR (Logout)", type="primary"):
         st.session_state.logado = False
         st.rerun()
 
@@ -147,11 +156,13 @@ with st.sidebar:
 # 📦 ESTOQUE
 # ==========================================
 if menu == "📦 Estoque":
-    st.title("📦 Gestão de Estoque")
-    
-    # BOTÃO GIGANTE DA PLANILHA AQUI!
-    url_planilha = f"https://docs.google.com/spreadsheets/d/{planilha.id}/edit"
-    st.markdown(f'<a href="{url_planilha}" target="_blank" class="btn-planilha">📊 ABRIR PLANILHA NO GOOGLE SHEETS</a>', unsafe_allow_html=True)
+    # Layout com colunas para o Título e o Botão ficarem lado a lado
+    c_titulo, c_botao = st.columns([3, 1])
+    with c_titulo:
+        st.title("📦 Gestão de Estoque")
+    with c_botao:
+        st.write("") # Espaço para alinhar com o título
+        st.link_button("📊 Abrir Planilha Google", LINK_PLANILHA, use_container_width=True)
     
     df_est = carregar_dados_estoque()
     
