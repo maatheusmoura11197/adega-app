@@ -59,7 +59,7 @@ try:
     client = gspread.authorize(creds)
     planilha = client.open("Fidelidade")
     
-    # URL da Planilha (Para o botão)
+    # URL da Planilha
     LINK_PLANILHA = f"https://docs.google.com/spreadsheets/d/{planilha.id}/edit"
 
     sheet_clientes = planilha.worksheet("Página1") 
@@ -134,7 +134,7 @@ def gerar_mensagem(nome_cliente, pontos):
     else: return f"PARABÉNS, {nome}!!! ✨🏆\nVocê completou 10 pontos e ganhou um **DESCONTO DE 20%** hoje! Aproveite! 🥳🍷", "🏆 ENVIAR PRÊMIO!"
 
 # ==========================================
-# 📱 MENU LATERAL (AGORA COM BOTÃO DA PLANILHA)
+# 📱 MENU LATERAL (COM LINK SIMPLES)
 # ==========================================
 with st.sidebar:
     st.image(ICON_URL, width=80)
@@ -143,8 +143,8 @@ with st.sidebar:
     
     st.divider()
     
-    st.write("📊 **Acesso Rápido:**")
-    st.link_button("Ir para Planilha no Google", LINK_PLANILHA, use_container_width=True)
+    # Link de texto nativo do Streamlit (Clicável e à prova de falhas)
+    st.markdown(f"**[📊 CLIQUE AQUI PARA ABRIR A PLANILHA]({LINK_PLANILHA})**")
     
     st.divider()
     
@@ -156,13 +156,7 @@ with st.sidebar:
 # 📦 ESTOQUE
 # ==========================================
 if menu == "📦 Estoque":
-    # Layout com colunas para o Título e o Botão ficarem lado a lado
-    c_titulo, c_botao = st.columns([3, 1])
-    with c_titulo:
-        st.title("📦 Gestão de Estoque")
-    with c_botao:
-        st.write("") # Espaço para alinhar com o título
-        st.link_button("📊 Abrir Planilha Google", LINK_PLANILHA, use_container_width=True)
+    st.title("📦 Gestão de Estoque")
     
     df_est = carregar_dados_estoque()
     
