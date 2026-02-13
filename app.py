@@ -22,7 +22,7 @@ import time
 
 # ==========================================
 
-st.set_page_config(page_title="Adega do Barão - Sistema Oficial", page_icon="🍷", layout="wide")
+st.set_page_config(page_title="Adega do Barão", page_icon="🍺", layout="wide")
 
 
 
@@ -138,7 +138,7 @@ if not st.session_state.logado:
 
                     with st.spinner("Acessando Adega..."):
 
-                        time.sleep(1) 
+                        time.sleep(5) 
 
                         st.session_state.logado = True
 
@@ -270,13 +270,13 @@ def calcular_estoque_fisico(total, ref_fardo):
 
 with st.sidebar:
 
-    st.title("🍷 Menu Principal")
+    st.title("🔧 Menu ")
 
     menu = st.radio("Navegar:", ["💰 Caixa", "📦 Estoque", "👥 Clientes", "📊 Históricos"])
 
     st.divider()
 
-    if st.button("SAIR (Logout)"):
+    if st.button("SAIR"):
 
         st.session_state.logado = False
 
@@ -292,7 +292,7 @@ with st.sidebar:
 
 if menu == "📦 Estoque":
 
-    st.title("📦 Gestão de Estoque")
+    st.title("📦 Controle de Estoque")
 
     df_est = pd.DataFrame(sheet_estoque.get_all_records())
 
