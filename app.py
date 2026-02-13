@@ -145,7 +145,15 @@ with st.sidebar:
 # 📦 MÓDULO ESTOQUE
 # ==========================================
 if menu == "📦 Estoque":
-    st.title("📦 Gestão de Estoque")
+    # --- NOVIDADE: Layout com título de um lado e botão da Planilha do outro ---
+    c_titulo, c_botao = st.columns([3, 1])
+    with c_titulo:
+        st.title("📦 Gestão de Estoque")
+    with c_botao:
+        st.write("") # Pequeno espaçamento para alinhar com o título
+        # O botão puxa automaticamente o link da sua planilha pelo "planilha.url"
+        st.link_button("📊 Abrir Planilha no Google Sheets", planilha.url, use_container_width=True)
+
     df_est = pd.DataFrame(sheet_estoque.get_all_records())
     
     t1, t2, t3 = st.tabs(["📋 Lista Detalhada", "🆕 Cadastrar Novo", "✏️ Editar/Excluir"])
