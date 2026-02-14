@@ -133,8 +133,7 @@ def gerar_mensagem(nome_cliente, pontos):
 # 📱 MENU LATERAL
 # ==========================================
 with st.sidebar:
-    st.image(ICON_URL, width=80)
-    st.title("🍷 Menu Principal")
+    st.title("🔧 Menu Principal")
     menu = st.radio("Navegar:", ["💰 Caixa", "📦 Estoque", "👥 Clientes", "📊 Históricos"])
     st.divider()
     if st.button("SAIR (Logout)"):
