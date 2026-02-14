@@ -171,7 +171,7 @@ if menu == "📦 Estoque":
         n_nome = st.text_input("Nome do Produto (Obrigatório):").upper()
         
         c_t1, c_t2 = st.columns(2)
-        n_tipo = c_t1.selectbox("Tipo:", ["LATA", "LONG NECK", "GARRAFA 600ML", "LITRÃO", "OUTROS"])
+        n_tipo = c_t1.selectbox("Tipo:", ["LATA", "LONG NECK","OUTROS"])
         lista_ml = ["200ml", "210ml", "269ml", "300ml", "330ml", "350ml", "473ml", "550ml", "600ml", "950ml", "1 Litro", "Outros"]
         sel_ml = c_t2.selectbox("Volume (ML):", lista_ml)
         n_ml = c_t2.text_input("Digite o volume:", key="novo_ml_custom") if sel_ml == "Outros" else sel_ml
@@ -216,7 +216,7 @@ if menu == "📦 Estoque":
                 row = df_est.iloc[idx]
                 
                 c_tipo, c_ml = st.columns(2)
-                list_tipos = ["LATA", "LONG NECK", "GARRAFA 600ML", "LITRÃO", "OUTROS"]
+                list_tipos = ["LATA", "LONG NECK", "OUTROS"]
                 novo_tipo = c_tipo.selectbox("Tipo:", list_tipos, index=list_tipos.index(row.get('Tipo', 'LATA')) if row.get('Tipo', 'LATA') in list_tipos else 0)
                 
                 ml_banco = str(row.get('ML', '350ml'))
