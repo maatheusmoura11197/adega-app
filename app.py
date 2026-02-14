@@ -153,17 +153,22 @@ if menu == "📦 Estoque":
     # --- LISTA ---
     if not df_est.empty:
         with t1:
-            if 'ML' not in df_est.columns: df_est['ML'] = "-"
+            # Fazemos uma cópia para não alterar os dados originais e aplicamos os cálculos
+            df_vis = df_est.copy()
+            if 'ML' not in df_vis.columns: df_vis['ML'] = "-"
 
-            df_est['custo_n'] = df_est['Custo'].apply(cvt_num)
-            df_est['venda_n'] = df_est['Venda'].apply(cvt_num)
-            df_est['Lucro Un.'] = df_est['venda_n'] - df_est['custo_n']
-            df_est['Custo (R$)'] = df_est['custo_n'].apply(para_real_visual)
-            df_est['Venda (R$)'] = df_est['venda_n'].apply(para_real_visual)
-            df_est['Lucro (R$)'] = df_est['Lucro Un.'].apply(para_real_visual)
-            df_est['Físico'] = df_est.apply(lambda r: calc_fisico(int(cvt_num(r['Estoque'])), int(cvt_num(r.get('Qtd_Fardo', 12)))), axis=1)
+            df_vis['custo_n'] = df_vis['Custo'].apply(cvt_num)
+            df_vis['venda_n'] = df_vis['Venda'].apply(cvt_num)
+            df_vis['Lucro Un.'] = df_vis['venda_n'] - df_vis['custo_n']
+            df_vis['Custo (R$)'] = df_vis['custo_n'].apply(para_real_visual)
+            df_vis['Venda (R$)'] = df_vis['venda_n'].apply(para_real_visual)
+            df_vis['Lucro (R$)'] = df_vis['Lucro Un.'].apply(para_real_visual)
+            df_vis['Físico'] = df_vis.apply(lambda r: calc_fisico(int(cvt_num(r['Estoque'])), int(cvt_num(r.get('Qtd_Fardo', 12)))), axis=1)
             
-            st.dataframe(df_est[['Nome', 'Tipo', 'ML', 'Físico', 'Custo (R$)', 'Venda (R$)', 'Lucro (R$)', 'Fornecedor', 'Data Compra']], use_container_width=True)
+            # --- ALTERAÇÃO AQUI: ORDEM ALFABÉTICA NA LISTA DETALHADA ---
+            df_vis = df_vis.sort_values(by='Nome')
+            
+            st.dataframe(df_vis[['Nome', 'Tipo', 'ML', 'Físico', 'Custo (R$)', 'Venda (R$)', 'Lucro (R$)', 'Fornecedor', 'Data Compra']], use_container_width=True)
 
     # --- NOVO (COM FORMULÁRIO PARA NÃO PULAR DE ABA) ---
     with t2:
@@ -213,8 +218,9 @@ if menu == "📦 Estoque":
     # --- EDITAR (COM FORMULÁRIO PARA NÃO PULAR DE ABA) ---
     with t3:
         if not df_est.empty:
-            # A seleção do produto fica DE FORA do form para puxar os dados na mesma hora
-            sel_e = st.selectbox("Editar:", ["Selecione..."] + df_est['Nome'].tolist())
+            # --- ALTERAÇÃO AQUI: ORDEM ALFABÉTICA NO MENU DROP-DOWN DE EDITAR ---
+            lista_produtos_ordenada = sorted(df_est['Nome'].astype(str).tolist())
+            sel_e = st.selectbox("Editar:", ["Selecione..."] + lista_produtos_ordenada)
             
             if sel_e != "Selecione...":
                 idx = df_est[df_est['Nome'] == sel_e].index[0]
@@ -284,7 +290,6 @@ elif menu == "💰 Caixa":
         df_cli = carregar_dados_clientes()
         df_est = carregar_dados_estoque()
         
-        # --- ALTERAÇÃO AQUI: ORDEM ALFABÉTICA NO CAIXA ---
         if not df_cli.empty:
             lista_clientes_ordenada = sorted((df_cli['nome'].astype(str) + " - " + df_cli['telefone'].astype(str)).tolist())
             opcoes_clientes = ["🆕 NOVO"] + lista_clientes_ordenada
@@ -299,7 +304,10 @@ elif menu == "💰 Caixa":
         
         st.divider()
         if not df_est.empty:
-            p_sel = st.selectbox("Produto:", ["(Selecione...)"] + df_est['Nome'].tolist())
+            # --- ALTERAÇÃO AQUI: ORDEM ALFABÉTICA NO PRODUTO DO CAIXA ---
+            lista_produtos_caixa = sorted(df_est['Nome'].astype(str).tolist())
+            p_sel = st.selectbox("Produto:", ["(Selecione...)"] + lista_produtos_caixa)
+            
             if p_sel != "(Selecione...)":
                 idx_p = df_est[df_est['Nome'] == p_sel].index[0]
                 row_p = df_est.iloc[idx_p]
@@ -342,7 +350,6 @@ elif menu == "👥 Clientes":
     st.title("👥 Gerenciar Clientes")
     df_c = carregar_dados_clientes()
     if not df_c.empty:
-        # --- ALTERAÇÃO AQUI: ORDEM ALFABÉTICA NOS CLIENTES ---
         lista_nomes_ordenada = sorted(df_c['nome'].astype(str).tolist())
         sel = st.selectbox("Editar Cliente:", ["Selecione..."] + lista_nomes_ordenada)
         
