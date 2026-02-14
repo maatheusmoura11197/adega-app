@@ -15,9 +15,6 @@ st.set_page_config(page_title="Adega do Barão", page_icon=ICON_URL, layout="wid
 
 st.markdown(f"""
     <style>
-    .stTabs [data-baseweb="tab-list"] {{ gap: 10px; }}
-    .stTabs [data-baseweb="tab"] {{ background-color: #0047AB; color: white !important; border-radius: 10px 10px 0px 0px; padding: 10px 20px; font-weight: bold; }}
-    .stTabs [aria-selected="true"] {{ background-color: #002D6E !important; }}
     div.stButton > button {{ background-color: #008CBA; color: white; font-weight: bold; border-radius: 10px; height: 3em; width: 100%; border: none; }}
     div.stButton > button[kind="primary"] {{ background-color: #FF0000 !important; }}
     .estoque-info {{ padding: 15px; background-color: #e3f2fd; border-left: 5px solid #2196f3; border-radius: 5px; color: #0d47a1; font-weight: bold; margin-bottom: 10px; }}
@@ -141,18 +138,20 @@ with st.sidebar:
         st.rerun()
 
 # ==========================================
-# 📦 ESTOQUE
+# 📦 ESTOQUE (CORRIGIDO: ABAS E LIMPEZA)
 # ==========================================
 if menu == "📦 Estoque":
     st.title("📦 Gestão de Estoque")
     
     df_est = carregar_dados_estoque()
     
-    t1, t2, t3 = st.tabs(["📋 Lista Detalhada", "🆕 Cadastrar Novo", "✏️ Editar/Excluir"])
+    # FIM DO PULA-PULA: O Radio Button memoriza onde você está, mesmo quando a tela recarrega!
+    aba_estoque = st.radio("Selecione a tela:", ["📋 Lista Detalhada", "🆕 Cadastrar Novo", "✏️ Editar/Excluir"], horizontal=True, label_visibility="collapsed")
+    st.divider()
 
     # --- LISTA ---
-    if not df_est.empty:
-        with t1:
+    if aba_estoque == "📋 Lista Detalhada":
+        if not df_est.empty:
             df_vis = df_est.copy()
             if 'ML' not in df_vis.columns: df_vis['ML'] = "-"
 
@@ -165,13 +164,15 @@ if menu == "📦 Estoque":
             df_vis['Físico'] = df_vis.apply(lambda r: calc_fisico(int(cvt_num(r['Estoque'])), int(cvt_num(r.get('Qtd_Fardo', 12)))), axis=1)
             
             df_vis = df_vis.sort_values(by='Nome')
-            
             st.dataframe(df_vis[['Nome', 'Tipo', 'ML', 'Físico', 'Custo (R$)', 'Venda (R$)', 'Lucro (R$)', 'Fornecedor', 'Data Compra']], use_container_width=True)
+        else:
+            st.info("O estoque está vazio. Cadastre o primeiro produto na tela 'Cadastrar Novo'.")
 
     # --- NOVO ---
-    with t2:
+    elif aba_estoque == "🆕 Cadastrar Novo":
         st.subheader("Cadastrar Produto")
-        with st.form("form_novo_produto"):
+        # O clear_on_submit=True garante que tudo apaga sozinho após o botão ser clicado!
+        with st.form("form_novo_produto", clear_on_submit=True):
             n_nome = st.text_input("Nome do Produto (Obrigatório):").upper()
             
             c_t1, c_t2 = st.columns(2)
@@ -211,20 +212,20 @@ if menu == "📦 Estoque":
                     sheet_estoque.append_row([n_nome, n_tipo, n_forn, salvar_com_ponto(cvt_num(n_custo)), salvar_com_ponto(cvt_num(n_venda)), qtd_final, n_data.strftime('%d/%m/%Y'), n_ref, ml_final])
                     sheet_hist_est.append_row([datetime.now().strftime('%d/%m/%Y %H:%M'), n_nome, "NOVO", qtd_final, n_forn])
                     limpar_cache()
-                    st.success("Cadastrado com Sucesso!"); time.sleep(1); st.rerun()
+                    # Como tiramos o st.rerun(), a tela limpa os campos instantaneamente e mostra a mensagem abaixo.
+                    st.success(f"✅ O produto '{n_nome}' foi cadastrado com sucesso! A tela já está limpa para o próximo.")
 
     # --- EDITAR ---
-    with t3:
+    elif aba_estoque == "✏️ Editar/Excluir":
         if not df_est.empty:
             lista_produtos_ordenada = sorted(df_est['Nome'].astype(str).tolist())
-            sel_e = st.selectbox("Editar:", ["Selecione..."] + lista_produtos_ordenada)
+            sel_e = st.selectbox("Selecione o produto para Editar:", ["Selecione..."] + lista_produtos_ordenada)
             
             if sel_e != "Selecione...":
                 idx = df_est[df_est['Nome'] == sel_e].index[0]
                 row = df_est.iloc[idx]
                 
                 with st.form("form_editar_produto"):
-                    # --- ALTERAÇÃO AQUI: CAMPO PARA EDITAR O NOME ---
                     novo_nome = st.text_input("Nome do Produto:", value=str(row['Nome'])).upper()
                     
                     c_tipo, c_ml = st.columns(2)
@@ -244,8 +245,8 @@ if menu == "📦 Estoque":
                     
                     st.write("---")
                     f1, f2 = st.columns(2)
-                    add_f = f1.number_input("Add Fardos:", min_value=0)
-                    add_u = f2.number_input("Add Unidades:", min_value=0)
+                    add_f = f1.number_input("Adicionar Estoque (Fardos):", min_value=0)
+                    add_u = f2.number_input("Adicionar Estoque (Unidades):", min_value=0)
                     
                     b_sal, b_exc = st.columns(2)
                     btn_salvar = b_sal.form_submit_button("💾 SALVAR ALTERAÇÕES")
@@ -259,7 +260,6 @@ if menu == "📦 Estoque":
                             ref = int(cvt_num(row.get('Qtd_Fardo', 12)))
                             novo_tot = int(cvt_num(row['Estoque'])) + (add_f * ref) + add_u
                             
-                            # --- ALTERAÇÃO AQUI: ATUALIZA O NOME NA PLANILHA TAMBÉM ---
                             sheet_estoque.update_cell(idx+2, 1, novo_nome)
                             sheet_estoque.update_cell(idx+2, 2, novo_tipo)
                             sheet_estoque.update_cell(idx+2, 3, v_forn)
@@ -270,7 +270,6 @@ if menu == "📦 Estoque":
                             try: sheet_estoque.update_cell(idx+2, 9, ml_save)
                             except: pass
                             
-                            # Registra no histórico usando o nome novo
                             if (add_f * ref) + add_u > 0: sheet_hist_est.append_row([datetime.now().strftime('%d/%m/%Y %H:%M'), novo_nome, "ENTRADA", (add_f * ref) + add_u, f"Forn: {v_forn}"])
                             limpar_cache()
                             st.success("Atualizado!"); time.sleep(1); st.rerun()
@@ -348,7 +347,7 @@ elif menu == "💰 Caixa":
                 st.session_state.b_txt = btn; st.session_state.v_suc = True; st.rerun()
 
 # ==========================================
-# 👥 CLIENTES
+# 👥 CLIENTES E 📊 HISTÓRICOS
 # ==========================================
 elif menu == "👥 Clientes":
     st.title("👥 Gerenciar Clientes")
@@ -373,11 +372,12 @@ elif menu == "👥 Clientes":
                     limpar_cache()
                     st.rerun()
 
-# ==========================================
-# 📊 HISTÓRICOS
-# ==========================================
 elif menu == "📊 Históricos":
     st.title("📊 Relatórios")
-    t1, t2 = st.tabs(["Vendas (Clientes)", "Movim. Estoque"])
-    with t1: st.dataframe(carregar_historico_cli(), use_container_width=True)
-    with t2: st.dataframe(carregar_historico_est(), use_container_width=True)
+    aba_hist = st.radio("Selecione o Relatório:", ["Vendas (Clientes)", "Movim. Estoque"], horizontal=True, label_visibility="collapsed")
+    st.divider()
+    
+    if aba_hist == "Vendas (Clientes)":
+        st.dataframe(carregar_historico_cli(), use_container_width=True)
+    elif aba_hist == "Movim. Estoque":
+        st.dataframe(carregar_historico_est(), use_container_width=True)
