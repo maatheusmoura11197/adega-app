@@ -133,6 +133,7 @@ def gerar_mensagem(nome_cliente, pontos):
 # 📱 MENU LATERAL
 # ==========================================
 with st.sidebar:
+ICON_URL = "https://splendid-plum-mslpekoeqx.edgeone.app/cerveja.png"
     st.title("🔧 Menu Principal")
     menu = st.radio("Navegar:", ["💰 Caixa", "📦 Estoque", "👥 Clientes", "📊 Históricos"])
     st.divider()
