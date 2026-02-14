@@ -71,22 +71,22 @@ try:
                 for i, h in enumerate(headers_padrao): sheet_estoque.update_cell(1, i+1, h)
         except: pass
 
-    @st.cache_data(ttl=700)
+    @st.cache_data(ttl=15)
     def carregar_dados_estoque():
         try: return pd.DataFrame(sheet_estoque.get_all_records())
         except: return pd.DataFrame()
 
-    @st.cache_data(ttl=700)
+    @st.cache_data(ttl=15)
     def carregar_dados_clientes():
         try: return pd.DataFrame(sheet_clientes.get_all_records())
         except: return pd.DataFrame()
 
-    @st.cache_data(ttl=700)
+    @st.cache_data(ttl=15)
     def carregar_historico_cli():
         try: return pd.DataFrame(sheet_hist_cli.get_all_records())
         except: return pd.DataFrame()
 
-    @st.cache_data(ttl=700)
+    @st.cache_data(ttl=15)
     def carregar_historico_est():
         try: return pd.DataFrame(sheet_hist_est.get_all_records())
         except: return pd.DataFrame()
