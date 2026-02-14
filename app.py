@@ -177,8 +177,8 @@ if menu == "📦 Estoque":
         n_ml = c_t2.text_input("Digite o volume:", key="novo_ml_custom") if sel_ml == "Outros" else sel_ml
 
         c1, c2 = st.columns(2)
-        n_custo = c1.text_input("Custo Unitário R$ (Obrigatório):", placeholder="3.06")
-        n_venda = c2.text_input("Venda Unitária R$ (Obrigatório):", placeholder="4.99")
+        n_custo = c1.text_input("Custo Unitário R$ (Obrigatório):", placeholder="0.00")
+        n_venda = c2.text_input("Venda Unitária R$ (Obrigatório):", placeholder="00.00")
         
         c3, c4 = st.columns(2)
         n_forn = c3.text_input("Fornecedor (Obrigatório):")
