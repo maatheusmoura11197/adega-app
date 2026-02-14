@@ -10,7 +10,7 @@ import time
 # ==========================================
 # ⚙️ CONFIGURAÇÃO E ESTILO
 # ==========================================
-ICON_URL = "https://cdn-icons-png.flaticon.com/512/3175/3175199.png"
+ICON_URL = "https://br.freepik.com/vetores-gratis/icone-de-celebracao-de-caneca-de-cerveja-isolado_70013881.htm#fromView=keyword&page=1&position=0&uuid=b54b6a06-7ff6-4f26-98c4-1e4e1910aebf&query=Cerveja+desenho"
 st.set_page_config(page_title="Adega do Barão", page_icon=ICON_URL, layout="wide")
 
 st.markdown(f"""
