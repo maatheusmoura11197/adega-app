@@ -10,7 +10,7 @@ import time
 # ==========================================
 # ⚙️ CONFIGURAÇÃO E ESTILO
 # ==========================================
-ICON_URL = "https://www.flaticon.com/br/icone-gratis/saude_7626599?related_id=7626728&origin.png"
+ICON_URL = "https://ibb.co/7x71t9sG"
 st.set_page_config(page_title="Adega do Barão", page_icon=ICON_URL, layout="wide")
 
 st.markdown(f"""
