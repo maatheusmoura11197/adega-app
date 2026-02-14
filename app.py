@@ -138,14 +138,13 @@ with st.sidebar:
         st.rerun()
 
 # ==========================================
-# 📦 ESTOQUE (CORRIGIDO: ABAS E LIMPEZA)
+# 📦 ESTOQUE
 # ==========================================
 if menu == "📦 Estoque":
     st.title("📦 Gestão de Estoque")
     
     df_est = carregar_dados_estoque()
     
-    # FIM DO PULA-PULA: O Radio Button memoriza onde você está, mesmo quando a tela recarrega!
     aba_estoque = st.radio("Selecione a tela:", ["📋 Lista Detalhada", "🆕 Cadastrar Novo", "✏️ Editar/Excluir"], horizontal=True, label_visibility="collapsed")
     st.divider()
 
@@ -171,7 +170,6 @@ if menu == "📦 Estoque":
     # --- NOVO ---
     elif aba_estoque == "🆕 Cadastrar Novo":
         st.subheader("Cadastrar Produto")
-        # O clear_on_submit=True garante que tudo apaga sozinho após o botão ser clicado!
         with st.form("form_novo_produto", clear_on_submit=True):
             n_nome = st.text_input("Nome do Produto (Obrigatório):").upper()
             
@@ -212,7 +210,6 @@ if menu == "📦 Estoque":
                     sheet_estoque.append_row([n_nome, n_tipo, n_forn, salvar_com_ponto(cvt_num(n_custo)), salvar_com_ponto(cvt_num(n_venda)), qtd_final, n_data.strftime('%d/%m/%Y'), n_ref, ml_final])
                     sheet_hist_est.append_row([datetime.now().strftime('%d/%m/%Y %H:%M'), n_nome, "NOVO", qtd_final, n_forn])
                     limpar_cache()
-                    # Como tiramos o st.rerun(), a tela limpa os campos instantaneamente e mostra a mensagem abaixo.
                     st.success(f"✅ O produto '{n_nome}' foi cadastrado com sucesso! A tela já está limpa para o próximo.")
 
     # --- EDITAR ---
@@ -243,11 +240,21 @@ if menu == "📦 Estoque":
                     v_custo = c_b.text_input("Custo (R$):", value=str(row['Custo']))
                     v_forn = st.text_input("Fornecedor:", value=str(row.get('Fornecedor', '')))
                     
+                    # --- ALTERAÇÃO AQUI: CONTROLE ABSOLUTO DE ESTOQUE ---
                     st.write("---")
-                    f1, f2 = st.columns(2)
-                    add_f = f1.number_input("Adicionar Estoque (Fardos):", min_value=0)
-                    add_u = f2.number_input("Adicionar Estoque (Unidades):", min_value=0)
+                    st.write("📦 **Controle de Estoque:**")
                     
+                    estoque_atual_num = int(cvt_num(row['Estoque']))
+                    ref_fardo = int(cvt_num(row.get('Qtd_Fardo', 12)))
+                    
+                    st.info(f"📊 Estoque Físico Atual no Sistema: **{calc_fisico(estoque_atual_num, ref_fardo)}** (Total: {estoque_atual_num} unid.)")
+                    
+                    e1, e2, e3 = st.columns(3)
+                    estoque_editado = e1.number_input("Corrigir Total (Unid.):", value=estoque_atual_num, min_value=0, help="Altere aqui se o sistema estiver com o número errado.")
+                    add_f = e2.number_input("➕ Nova Compra (Fardos):", min_value=0)
+                    add_u = e3.number_input("➕ Nova Compra (Unid.):", min_value=0)
+                    
+                    st.write("---")
                     b_sal, b_exc = st.columns(2)
                     btn_salvar = b_sal.form_submit_button("💾 SALVAR ALTERAÇÕES")
                     btn_excluir = b_exc.form_submit_button("🗑️ EXCLUIR PRODUTO")
@@ -257,8 +264,9 @@ if menu == "📦 Estoque":
                             st.error("⚠️ O nome do produto não pode ficar vazio!")
                         else:
                             ml_save = final_ml_txt if sel_ml_edit == "Outros" else sel_ml_edit
-                            ref = int(cvt_num(row.get('Qtd_Fardo', 12)))
-                            novo_tot = int(cvt_num(row['Estoque'])) + (add_f * ref) + add_u
+                            
+                            # A matemática da nova lógica: Estoque Editado + Novas Compras
+                            novo_tot = estoque_editado + (add_f * ref_fardo) + add_u
                             
                             sheet_estoque.update_cell(idx+2, 1, novo_nome)
                             sheet_estoque.update_cell(idx+2, 2, novo_tipo)
@@ -270,7 +278,14 @@ if menu == "📦 Estoque":
                             try: sheet_estoque.update_cell(idx+2, 9, ml_save)
                             except: pass
                             
-                            if (add_f * ref) + add_u > 0: sheet_hist_est.append_row([datetime.now().strftime('%d/%m/%Y %H:%M'), novo_nome, "ENTRADA", (add_f * ref) + add_u, f"Forn: {v_forn}"])
+                            # Salva no histórico se houve adição ou ajuste
+                            if (add_f * ref_fardo) + add_u > 0: 
+                                sheet_hist_est.append_row([datetime.now().strftime('%d/%m/%Y %H:%M'), novo_nome, "ENTRADA", (add_f * ref_fardo) + add_u, f"Forn: {v_forn}"])
+                            elif estoque_editado != estoque_atual_num:
+                                diff = estoque_editado - estoque_atual_num
+                                tipo_ajuste = "AJUSTE (+)" if diff > 0 else "AJUSTE (-)"
+                                sheet_hist_est.append_row([datetime.now().strftime('%d/%m/%Y %H:%M'), novo_nome, tipo_ajuste, abs(diff), "Correção Manual"])
+                                
                             limpar_cache()
                             st.success("Atualizado!"); time.sleep(1); st.rerun()
                     
@@ -347,7 +362,7 @@ elif menu == "💰 Caixa":
                 st.session_state.b_txt = btn; st.session_state.v_suc = True; st.rerun()
 
 # ==========================================
-# 👥 CLIENTES E 📊 HISTÓRICOS
+# 👥 CLIENTES
 # ==========================================
 elif menu == "👥 Clientes":
     st.title("👥 Gerenciar Clientes")
@@ -372,6 +387,9 @@ elif menu == "👥 Clientes":
                     limpar_cache()
                     st.rerun()
 
+# ==========================================
+# 📊 HISTÓRICOS
+# ==========================================
 elif menu == "📊 Históricos":
     st.title("📊 Relatórios")
     aba_hist = st.radio("Selecione o Relatório:", ["Vendas (Clientes)", "Movim. Estoque"], horizontal=True, label_visibility="collapsed")
