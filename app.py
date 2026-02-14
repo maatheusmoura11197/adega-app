@@ -136,7 +136,7 @@ with st.sidebar:
     st.title("🔧 Menu Principal")
     menu = st.radio("Navegar:", ["💰 Caixa", "📦 Estoque", "👥 Clientes", "📊 Históricos"])
     st.divider()
-    if st.button("SAIR )":
+    if st.button("SAIR "):
         st.session_state.logado = False
         st.rerun()
 
