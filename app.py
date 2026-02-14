@@ -153,7 +153,6 @@ if menu == "📦 Estoque":
     # --- LISTA ---
     if not df_est.empty:
         with t1:
-            # Fazemos uma cópia para não alterar os dados originais e aplicamos os cálculos
             df_vis = df_est.copy()
             if 'ML' not in df_vis.columns: df_vis['ML'] = "-"
 
@@ -165,12 +164,11 @@ if menu == "📦 Estoque":
             df_vis['Lucro (R$)'] = df_vis['Lucro Un.'].apply(para_real_visual)
             df_vis['Físico'] = df_vis.apply(lambda r: calc_fisico(int(cvt_num(r['Estoque'])), int(cvt_num(r.get('Qtd_Fardo', 12)))), axis=1)
             
-            # --- ALTERAÇÃO AQUI: ORDEM ALFABÉTICA NA LISTA DETALHADA ---
             df_vis = df_vis.sort_values(by='Nome')
             
             st.dataframe(df_vis[['Nome', 'Tipo', 'ML', 'Físico', 'Custo (R$)', 'Venda (R$)', 'Lucro (R$)', 'Fornecedor', 'Data Compra']], use_container_width=True)
 
-    # --- NOVO (COM FORMULÁRIO PARA NÃO PULAR DE ABA) ---
+    # --- NOVO ---
     with t2:
         st.subheader("Cadastrar Produto")
         with st.form("form_novo_produto"):
@@ -215,10 +213,9 @@ if menu == "📦 Estoque":
                     limpar_cache()
                     st.success("Cadastrado com Sucesso!"); time.sleep(1); st.rerun()
 
-    # --- EDITAR (COM FORMULÁRIO PARA NÃO PULAR DE ABA) ---
+    # --- EDITAR ---
     with t3:
         if not df_est.empty:
-            # --- ALTERAÇÃO AQUI: ORDEM ALFABÉTICA NO MENU DROP-DOWN DE EDITAR ---
             lista_produtos_ordenada = sorted(df_est['Nome'].astype(str).tolist())
             sel_e = st.selectbox("Editar:", ["Selecione..."] + lista_produtos_ordenada)
             
@@ -226,8 +223,10 @@ if menu == "📦 Estoque":
                 idx = df_est[df_est['Nome'] == sel_e].index[0]
                 row = df_est.iloc[idx]
                 
-                # A partir daqui, é a "Caixa Protetora"
                 with st.form("form_editar_produto"):
+                    # --- ALTERAÇÃO AQUI: CAMPO PARA EDITAR O NOME ---
+                    novo_nome = st.text_input("Nome do Produto:", value=str(row['Nome'])).upper()
+                    
                     c_tipo, c_ml = st.columns(2)
                     list_tipos = ["LATA", "LONG NECK", "OUTROS"]
                     novo_tipo = c_tipo.selectbox("Tipo:", list_tipos, index=list_tipos.index(row.get('Tipo', 'LATA')) if row.get('Tipo', 'LATA') in list_tipos else 0)
@@ -253,22 +252,28 @@ if menu == "📦 Estoque":
                     btn_excluir = b_exc.form_submit_button("🗑️ EXCLUIR PRODUTO")
                     
                     if btn_salvar:
-                        ml_save = final_ml_txt if sel_ml_edit == "Outros" else sel_ml_edit
-                        ref = int(cvt_num(row.get('Qtd_Fardo', 12)))
-                        novo_tot = int(cvt_num(row['Estoque'])) + (add_f * ref) + add_u
-                        
-                        sheet_estoque.update_cell(idx+2, 2, novo_tipo)
-                        sheet_estoque.update_cell(idx+2, 3, v_forn)
-                        sheet_estoque.update_cell(idx+2, 4, salvar_com_ponto(cvt_num(v_custo)))
-                        sheet_estoque.update_cell(idx+2, 5, salvar_com_ponto(cvt_num(v_venda)))
-                        sheet_estoque.update_cell(idx+2, 6, novo_tot)
-                        sheet_estoque.update_cell(idx+2, 7, date.today().strftime('%d/%m/%Y'))
-                        try: sheet_estoque.update_cell(idx+2, 9, ml_save)
-                        except: pass
-                        
-                        if (add_f * ref) + add_u > 0: sheet_hist_est.append_row([datetime.now().strftime('%d/%m/%Y %H:%M'), sel_e, "ENTRADA", (add_f * ref) + add_u, f"Forn: {v_forn}"])
-                        limpar_cache()
-                        st.success("Atualizado!"); time.sleep(1); st.rerun()
+                        if not novo_nome:
+                            st.error("⚠️ O nome do produto não pode ficar vazio!")
+                        else:
+                            ml_save = final_ml_txt if sel_ml_edit == "Outros" else sel_ml_edit
+                            ref = int(cvt_num(row.get('Qtd_Fardo', 12)))
+                            novo_tot = int(cvt_num(row['Estoque'])) + (add_f * ref) + add_u
+                            
+                            # --- ALTERAÇÃO AQUI: ATUALIZA O NOME NA PLANILHA TAMBÉM ---
+                            sheet_estoque.update_cell(idx+2, 1, novo_nome)
+                            sheet_estoque.update_cell(idx+2, 2, novo_tipo)
+                            sheet_estoque.update_cell(idx+2, 3, v_forn)
+                            sheet_estoque.update_cell(idx+2, 4, salvar_com_ponto(cvt_num(v_custo)))
+                            sheet_estoque.update_cell(idx+2, 5, salvar_com_ponto(cvt_num(v_venda)))
+                            sheet_estoque.update_cell(idx+2, 6, novo_tot)
+                            sheet_estoque.update_cell(idx+2, 7, date.today().strftime('%d/%m/%Y'))
+                            try: sheet_estoque.update_cell(idx+2, 9, ml_save)
+                            except: pass
+                            
+                            # Registra no histórico usando o nome novo
+                            if (add_f * ref) + add_u > 0: sheet_hist_est.append_row([datetime.now().strftime('%d/%m/%Y %H:%M'), novo_nome, "ENTRADA", (add_f * ref) + add_u, f"Forn: {v_forn}"])
+                            limpar_cache()
+                            st.success("Atualizado!"); time.sleep(1); st.rerun()
                     
                     if btn_excluir:
                         sheet_estoque.delete_rows(int(idx + 2))
@@ -304,7 +309,6 @@ elif menu == "💰 Caixa":
         
         st.divider()
         if not df_est.empty:
-            # --- ALTERAÇÃO AQUI: ORDEM ALFABÉTICA NO PRODUTO DO CAIXA ---
             lista_produtos_caixa = sorted(df_est['Nome'].astype(str).tolist())
             p_sel = st.selectbox("Produto:", ["(Selecione...)"] + lista_produtos_caixa)
             
