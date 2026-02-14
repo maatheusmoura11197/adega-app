@@ -10,7 +10,7 @@ import time
 # ==========================================
 # ⚙️ CONFIGURAÇÃO E ESTILO
 # ==========================================
-ICON_URL = "https://ibb.co/7x71t9sG"
+ICON_URL = "https://willowy-amaranth-qb4wxcdpp0.edgeone.app/Captura%20de%20tela%202026-02-13%20213914.png"
 st.set_page_config(page_title="Adega do Barão", page_icon=ICON_URL, layout="wide")
 
 st.markdown(f"""
