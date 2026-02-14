@@ -165,97 +165,109 @@ if menu == "📦 Estoque":
             
             st.dataframe(df_est[['Nome', 'Tipo', 'ML', 'Físico', 'Custo (R$)', 'Venda (R$)', 'Lucro (R$)', 'Fornecedor', 'Data Compra']], use_container_width=True)
 
-    # --- NOVO ---
+    # --- NOVO (COM FORMULÁRIO PARA NÃO PULAR DE ABA) ---
     with t2:
         st.subheader("Cadastrar Produto")
-        n_nome = st.text_input("Nome do Produto (Obrigatório):").upper()
-        
-        c_t1, c_t2 = st.columns(2)
-        n_tipo = c_t1.selectbox("Tipo:", ["LATA", "LONG NECK","OUTROS"])
-        lista_ml = ["200ml", "210ml", "269ml", "300ml", "330ml", "350ml", "473ml", "550ml", "600ml", "950ml", "1 Litro", "Outros"]
-        sel_ml = c_t2.selectbox("Volume (ML):", lista_ml)
-        n_ml = c_t2.text_input("Digite o volume:", key="novo_ml_custom") if sel_ml == "Outros" else sel_ml
-
-        c1, c2 = st.columns(2)
-        n_custo = c1.text_input("Custo Unitário R$ (Obrigatório):", placeholder="0.00")
-        n_venda = c2.text_input("Venda Unitária R$ (Obrigatório):", placeholder="00.00")
-        
-        c3, c4 = st.columns(2)
-        n_forn = c3.text_input("Fornecedor (Obrigatório):")
-        n_data = c4.date_input("Data da Compra", date.today())
-        
-        st.divider()
-        st.write("📦 **Estoque Inicial:**")
-        tipo_compra = st.radio("Formato da Compra:", ["Fardo Fechado", "Unidades Soltas"], horizontal=True)
-        col_a, col_b = st.columns(2)
-        n_ref = col_a.number_input("Itens por Fardo (Ref):", value=12)
-        
-        qtd_inicial = col_b.number_input("Qtd Fardos:" if tipo_compra == "Fardo Fechado" else "Qtd Unidades:", min_value=0)
-        qtd_final = qtd_inicial * n_ref if tipo_compra == "Fardo Fechado" else qtd_inicial
-        
-        if st.button("✅ CADASTRAR PRODUTO", type="primary"):
-            erro = False
-            if not n_nome: st.error("⚠️ Nome Obrigatório"); erro = True
-            if not n_custo: st.error("⚠️ Custo Obrigatório"); erro = True
-            if not n_venda: st.error("⚠️ Venda Obrigatória"); erro = True
-            if not n_forn: st.error("⚠️ Fornecedor Obrigatório"); erro = True
-            if sel_ml == "Outros" and not n_ml: st.error("⚠️ Digite o ML"); erro = True
+        with st.form("form_novo_produto"):
+            n_nome = st.text_input("Nome do Produto (Obrigatório):").upper()
             
-            if not erro:
-                sheet_estoque.append_row([n_nome, n_tipo, n_forn, salvar_com_ponto(cvt_num(n_custo)), salvar_com_ponto(cvt_num(n_venda)), qtd_final, n_data.strftime('%d/%m/%Y'), n_ref, n_ml])
-                sheet_hist_est.append_row([datetime.now().strftime('%d/%m/%Y %H:%M'), n_nome, "NOVO", qtd_final, n_forn])
-                limpar_cache()
-                st.success("Cadastrado com Sucesso!"); time.sleep(1); st.rerun()
+            c_t1, c_t2 = st.columns(2)
+            n_tipo = c_t1.selectbox("Tipo:", ["LATA", "LONG NECK","OUTROS"])
+            lista_ml = ["200ml", "210ml", "269ml", "300ml", "330ml", "350ml", "473ml", "550ml", "600ml", "950ml", "1 Litro", "Outros"]
+            sel_ml = c_t2.selectbox("Volume (ML):", lista_ml)
+            n_ml = c_t2.text_input("Se escolheu 'Outros', digite o ML aqui:")
 
-    # --- EDITAR ---
+            c1, c2 = st.columns(2)
+            n_custo = c1.text_input("Custo Unitário R$ (Obrigatório):", placeholder="0.00")
+            n_venda = c2.text_input("Venda Unitária R$ (Obrigatório):", placeholder="00.00")
+            
+            c3, c4 = st.columns(2)
+            n_forn = c3.text_input("Fornecedor (Obrigatório):")
+            n_data = c4.date_input("Data da Compra", date.today())
+            
+            st.divider()
+            st.write("📦 **Estoque Inicial:**")
+            tipo_compra = st.radio("Formato da Compra:", ["Fardo Fechado", "Unidades Soltas"], horizontal=True)
+            col_a, col_b = st.columns(2)
+            n_ref = col_a.number_input("Itens por Fardo (Ref):", value=12)
+            
+            qtd_inicial = col_b.number_input("Qtd Fardos / Unidades:" , min_value=0)
+            
+            if st.form_submit_button("✅ CADASTRAR PRODUTO", type="primary"):
+                qtd_final = qtd_inicial * n_ref if tipo_compra == "Fardo Fechado" else qtd_inicial
+                ml_final = n_ml if sel_ml == "Outros" else sel_ml
+                
+                erro = False
+                if not n_nome: st.error("⚠️ Nome Obrigatório"); erro = True
+                if not n_custo: st.error("⚠️ Custo Obrigatório"); erro = True
+                if not n_venda: st.error("⚠️ Venda Obrigatória"); erro = True
+                if not n_forn: st.error("⚠️ Fornecedor Obrigatório"); erro = True
+                if sel_ml == "Outros" and not n_ml: st.error("⚠️ Digite o ML"); erro = True
+                
+                if not erro:
+                    sheet_estoque.append_row([n_nome, n_tipo, n_forn, salvar_com_ponto(cvt_num(n_custo)), salvar_com_ponto(cvt_num(n_venda)), qtd_final, n_data.strftime('%d/%m/%Y'), n_ref, ml_final])
+                    sheet_hist_est.append_row([datetime.now().strftime('%d/%m/%Y %H:%M'), n_nome, "NOVO", qtd_final, n_forn])
+                    limpar_cache()
+                    st.success("Cadastrado com Sucesso!"); time.sleep(1); st.rerun()
+
+    # --- EDITAR (COM FORMULÁRIO PARA NÃO PULAR DE ABA) ---
     with t3:
         if not df_est.empty:
+            # A seleção do produto fica DE FORA do form para puxar os dados na mesma hora
             sel_e = st.selectbox("Editar:", ["Selecione..."] + df_est['Nome'].tolist())
+            
             if sel_e != "Selecione...":
                 idx = df_est[df_est['Nome'] == sel_e].index[0]
                 row = df_est.iloc[idx]
                 
-                c_tipo, c_ml = st.columns(2)
-                list_tipos = ["LATA", "LONG NECK", "OUTROS"]
-                novo_tipo = c_tipo.selectbox("Tipo:", list_tipos, index=list_tipos.index(row.get('Tipo', 'LATA')) if row.get('Tipo', 'LATA') in list_tipos else 0)
-                
-                ml_banco = str(row.get('ML', '350ml'))
-                idx_ml_ini = lista_ml.index(ml_banco) if ml_banco in lista_ml else 11
-                sel_ml_edit = c_ml.selectbox("Volume (ML):", lista_ml, index=idx_ml_ini, key="ml_edit_select")
-                final_ml = c_ml.text_input("Digite o volume personalizado:", value=ml_banco if ml_banco not in lista_ml else "", key="ml_edit_custom") if sel_ml_edit == "Outros" else sel_ml_edit
+                # A partir daqui, é a "Caixa Protetora"
+                with st.form("form_editar_produto"):
+                    c_tipo, c_ml = st.columns(2)
+                    list_tipos = ["LATA", "LONG NECK", "OUTROS"]
+                    novo_tipo = c_tipo.selectbox("Tipo:", list_tipos, index=list_tipos.index(row.get('Tipo', 'LATA')) if row.get('Tipo', 'LATA') in list_tipos else 0)
+                    
+                    lista_ml = ["200ml", "210ml", "269ml", "300ml", "330ml", "350ml", "473ml", "550ml", "600ml", "950ml", "1 Litro", "Outros"]
+                    ml_banco = str(row.get('ML', '350ml'))
+                    idx_ml_ini = lista_ml.index(ml_banco) if ml_banco in lista_ml else 11
+                    sel_ml_edit = c_ml.selectbox("Volume (ML):", lista_ml, index=idx_ml_ini)
+                    final_ml_txt = c_ml.text_input("Se 'Outros', digite o ML:", value=ml_banco if ml_banco not in lista_ml else "")
 
-                c_a, c_b = st.columns(2)
-                v_venda = c_a.text_input("Venda (R$):", value=str(row['Venda']))
-                v_custo = c_b.text_input("Custo (R$):", value=str(row['Custo']))
-                v_forn = st.text_input("Fornecedor:", value=str(row.get('Fornecedor', '')))
-                
-                st.write("---")
-                f1, f2 = st.columns(2)
-                add_f = f1.number_input("Add Fardos:", min_value=0)
-                add_u = f2.number_input("Add Unidades:", min_value=0)
-                
-                b_sal, b_exc = st.columns(2)
-                if b_sal.button("💾 SALVAR ALTERAÇÕES"):
-                    ref = int(cvt_num(row.get('Qtd_Fardo', 12)))
-                    novo_tot = int(cvt_num(row['Estoque'])) + (add_f * ref) + add_u
+                    c_a, c_b = st.columns(2)
+                    v_venda = c_a.text_input("Venda (R$):", value=str(row['Venda']))
+                    v_custo = c_b.text_input("Custo (R$):", value=str(row['Custo']))
+                    v_forn = st.text_input("Fornecedor:", value=str(row.get('Fornecedor', '')))
                     
-                    sheet_estoque.update_cell(idx+2, 2, novo_tipo)
-                    sheet_estoque.update_cell(idx+2, 3, v_forn)
-                    sheet_estoque.update_cell(idx+2, 4, salvar_com_ponto(cvt_num(v_custo)))
-                    sheet_estoque.update_cell(idx+2, 5, salvar_com_ponto(cvt_num(v_venda)))
-                    sheet_estoque.update_cell(idx+2, 6, novo_tot)
-                    sheet_estoque.update_cell(idx+2, 7, date.today().strftime('%d/%m/%Y'))
-                    try: sheet_estoque.update_cell(idx+2, 9, final_ml)
-                    except: pass
+                    st.write("---")
+                    f1, f2 = st.columns(2)
+                    add_f = f1.number_input("Add Fardos:", min_value=0)
+                    add_u = f2.number_input("Add Unidades:", min_value=0)
                     
-                    if (add_f * ref) + add_u > 0: sheet_hist_est.append_row([datetime.now().strftime('%d/%m/%Y %H:%M'), sel_e, "ENTRADA", (add_f * ref) + add_u, f"Forn: {v_forn}"])
-                    limpar_cache()
-                    st.success("Atualizado!"); time.sleep(1); st.rerun()
-                
-                if b_exc.button("🗑️ EXCLUIR PRODUTO"):
-                    sheet_estoque.delete_rows(int(idx + 2))
-                    limpar_cache()
-                    st.warning("Excluído!"); time.sleep(1); st.rerun()
+                    b_sal, b_exc = st.columns(2)
+                    btn_salvar = b_sal.form_submit_button("💾 SALVAR ALTERAÇÕES")
+                    btn_excluir = b_exc.form_submit_button("🗑️ EXCLUIR PRODUTO")
+                    
+                    if btn_salvar:
+                        ml_save = final_ml_txt if sel_ml_edit == "Outros" else sel_ml_edit
+                        ref = int(cvt_num(row.get('Qtd_Fardo', 12)))
+                        novo_tot = int(cvt_num(row['Estoque'])) + (add_f * ref) + add_u
+                        
+                        sheet_estoque.update_cell(idx+2, 2, novo_tipo)
+                        sheet_estoque.update_cell(idx+2, 3, v_forn)
+                        sheet_estoque.update_cell(idx+2, 4, salvar_com_ponto(cvt_num(v_custo)))
+                        sheet_estoque.update_cell(idx+2, 5, salvar_com_ponto(cvt_num(v_venda)))
+                        sheet_estoque.update_cell(idx+2, 6, novo_tot)
+                        sheet_estoque.update_cell(idx+2, 7, date.today().strftime('%d/%m/%Y'))
+                        try: sheet_estoque.update_cell(idx+2, 9, ml_save)
+                        except: pass
+                        
+                        if (add_f * ref) + add_u > 0: sheet_hist_est.append_row([datetime.now().strftime('%d/%m/%Y %H:%M'), sel_e, "ENTRADA", (add_f * ref) + add_u, f"Forn: {v_forn}"])
+                        limpar_cache()
+                        st.success("Atualizado!"); time.sleep(1); st.rerun()
+                    
+                    if btn_excluir:
+                        sheet_estoque.delete_rows(int(idx + 2))
+                        limpar_cache()
+                        st.warning("Excluído!"); time.sleep(1); st.rerun()
 
 # ==========================================
 # 💰 CAIXA
