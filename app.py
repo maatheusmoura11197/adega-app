@@ -145,6 +145,13 @@ if menu == "📦 Estoque":
     
     df_est = carregar_dados_estoque()
     
+    # --- INTELIGÊNCIA: NOME DE EXIBIÇÃO COMPOSTO ---
+    if not df_est.empty:
+        if 'ML' not in df_est.columns: df_est['ML'] = "-"
+        if 'Tipo' not in df_est.columns: df_est['Tipo'] = "-"
+        # Cria a coluna inteligente "Nome_Exibicao"
+        df_est['Nome_Exibicao'] = df_est['Nome'].astype(str) + " - " + df_est['Tipo'].astype(str) + " (" + df_est['ML'].astype(str) + ")"
+    
     aba_estoque = st.radio("Selecione a tela:", ["📋 Lista Detalhada", "🆕 Cadastrar Novo", "✏️ Editar/Excluir"], horizontal=True, label_visibility="collapsed")
     st.divider()
 
@@ -152,7 +159,6 @@ if menu == "📦 Estoque":
     if aba_estoque == "📋 Lista Detalhada":
         if not df_est.empty:
             df_vis = df_est.copy()
-            if 'ML' not in df_vis.columns: df_vis['ML'] = "-"
 
             df_vis['custo_n'] = df_vis['Custo'].apply(cvt_num)
             df_vis['venda_n'] = df_vis['Venda'].apply(cvt_num)
@@ -174,7 +180,7 @@ if menu == "📦 Estoque":
             n_nome = st.text_input("Nome do Produto (Obrigatório):").upper()
             
             c_t1, c_t2 = st.columns(2)
-            n_tipo = c_t1.selectbox("Tipo:", ["LATA", "LONG NECK","OUTROS"])
+            n_tipo = c_t1.selectbox("Tipo:", ["LATA", "LONG NECK", "GARRAFA 600ML", "LITRÃO", "OUTROS"])
             lista_ml = ["200ml", "210ml", "269ml", "300ml", "330ml", "350ml", "473ml", "550ml", "600ml", "950ml", "1 Litro", "Outros"]
             sel_ml = c_t2.selectbox("Volume (ML):", lista_ml)
             n_ml = c_t2.text_input("Se escolheu 'Outros', digite o ML aqui:")
@@ -215,18 +221,20 @@ if menu == "📦 Estoque":
     # --- EDITAR ---
     elif aba_estoque == "✏️ Editar/Excluir":
         if not df_est.empty:
-            lista_produtos_ordenada = sorted(df_est['Nome'].astype(str).tolist())
+            # Puxa o nome inteligente para o Selectbox
+            lista_produtos_ordenada = sorted(df_est['Nome_Exibicao'].astype(str).tolist())
             sel_e = st.selectbox("Selecione o produto para Editar:", ["Selecione..."] + lista_produtos_ordenada)
             
             if sel_e != "Selecione...":
-                idx = df_est[df_est['Nome'] == sel_e].index[0]
+                # Acha a linha exata usando o nome inteligente
+                idx = df_est[df_est['Nome_Exibicao'] == sel_e].index[0]
                 row = df_est.iloc[idx]
                 
                 with st.form("form_editar_produto"):
-                    novo_nome = st.text_input("Nome do Produto:", value=str(row['Nome'])).upper()
+                    novo_nome = st.text_input("Nome do Produto (na Planilha):", value=str(row['Nome'])).upper()
                     
                     c_tipo, c_ml = st.columns(2)
-                    list_tipos = ["LATA", "LONG NECK", "OUTROS"]
+                    list_tipos = ["LATA", "LONG NECK", "GARRAFA 600ML", "LITRÃO", "OUTROS"]
                     novo_tipo = c_tipo.selectbox("Tipo:", list_tipos, index=list_tipos.index(row.get('Tipo', 'LATA')) if row.get('Tipo', 'LATA') in list_tipos else 0)
                     
                     lista_ml = ["200ml", "210ml", "269ml", "300ml", "330ml", "350ml", "473ml", "550ml", "600ml", "950ml", "1 Litro", "Outros"]
@@ -240,7 +248,6 @@ if menu == "📦 Estoque":
                     v_custo = c_b.text_input("Custo (R$):", value=str(row['Custo']))
                     v_forn = st.text_input("Fornecedor:", value=str(row.get('Fornecedor', '')))
                     
-                    # --- ALTERAÇÃO AQUI: CONTROLE ABSOLUTO DE ESTOQUE ---
                     st.write("---")
                     st.write("📦 **Controle de Estoque:**")
                     
@@ -264,8 +271,6 @@ if menu == "📦 Estoque":
                             st.error("⚠️ O nome do produto não pode ficar vazio!")
                         else:
                             ml_save = final_ml_txt if sel_ml_edit == "Outros" else sel_ml_edit
-                            
-                            # A matemática da nova lógica: Estoque Editado + Novas Compras
                             novo_tot = estoque_editado + (add_f * ref_fardo) + add_u
                             
                             sheet_estoque.update_cell(idx+2, 1, novo_nome)
@@ -278,13 +283,12 @@ if menu == "📦 Estoque":
                             try: sheet_estoque.update_cell(idx+2, 9, ml_save)
                             except: pass
                             
-                            # Salva no histórico se houve adição ou ajuste
                             if (add_f * ref_fardo) + add_u > 0: 
-                                sheet_hist_est.append_row([datetime.now().strftime('%d/%m/%Y %H:%M'), novo_nome, "ENTRADA", (add_f * ref_fardo) + add_u, f"Forn: {v_forn}"])
+                                sheet_hist_est.append_row([datetime.now().strftime('%d/%m/%Y %H:%M'), sel_e, "ENTRADA", (add_f * ref_fardo) + add_u, f"Forn: {v_forn}"])
                             elif estoque_editado != estoque_atual_num:
                                 diff = estoque_editado - estoque_atual_num
                                 tipo_ajuste = "AJUSTE (+)" if diff > 0 else "AJUSTE (-)"
-                                sheet_hist_est.append_row([datetime.now().strftime('%d/%m/%Y %H:%M'), novo_nome, tipo_ajuste, abs(diff), "Correção Manual"])
+                                sheet_hist_est.append_row([datetime.now().strftime('%d/%m/%Y %H:%M'), sel_e, tipo_ajuste, abs(diff), "Correção Manual"])
                                 
                             limpar_cache()
                             st.success("Atualizado!"); time.sleep(1); st.rerun()
@@ -309,6 +313,12 @@ elif menu == "💰 Caixa":
         df_cli = carregar_dados_clientes()
         df_est = carregar_dados_estoque()
         
+        # Inteligência: Nome Composto também no Caixa
+        if not df_est.empty:
+            if 'ML' not in df_est.columns: df_est['ML'] = "-"
+            if 'Tipo' not in df_est.columns: df_est['Tipo'] = "-"
+            df_est['Nome_Exibicao'] = df_est['Nome'].astype(str) + " - " + df_est['Tipo'].astype(str) + " (" + df_est['ML'].astype(str) + ")"
+
         if not df_cli.empty:
             lista_clientes_ordenada = sorted((df_cli['nome'].astype(str) + " - " + df_cli['telefone'].astype(str)).tolist())
             opcoes_clientes = ["🆕 NOVO"] + lista_clientes_ordenada
@@ -323,11 +333,12 @@ elif menu == "💰 Caixa":
         
         st.divider()
         if not df_est.empty:
-            lista_produtos_caixa = sorted(df_est['Nome'].astype(str).tolist())
+            lista_produtos_caixa = sorted(df_est['Nome_Exibicao'].astype(str).tolist())
             p_sel = st.selectbox("Produto:", ["(Selecione...)"] + lista_produtos_caixa)
             
             if p_sel != "(Selecione...)":
-                idx_p = df_est[df_est['Nome'] == p_sel].index[0]
+                # Busca pelo nome inteligente
+                idx_p = df_est[df_est['Nome_Exibicao'] == p_sel].index[0]
                 row_p = df_est.iloc[idx_p]
                 st.markdown(f'<div class="estoque-info">📊 EM ESTOQUE: {calc_fisico(int(cvt_num(row_p["Estoque"])), int(cvt_num(row_p.get("Qtd_Fardo", 12))))}</div>', unsafe_allow_html=True)
 
@@ -343,6 +354,7 @@ elif menu == "💰 Caixa":
                     
                     if atual >= baixa:
                         sheet_estoque.update_cell(idx_p+2, 6, atual - baixa)
+                        # Salva no histórico a venda do produto inteligente para relatórios perfeitos
                         sheet_hist_est.append_row([datetime.now().strftime('%d/%m/%Y %H:%M'), p_sel, "VENDA", baixa, salvar_com_ponto(baixa * cvt_num(df_est.iloc[idx_p]['Venda']))])
                     else: st.error(f"Estoque insuficiente! Você tem {atual} unidades."); st.stop()
 
