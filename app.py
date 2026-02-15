@@ -191,7 +191,7 @@ if menu == "📦 Estoque":
             
             c3, c4 = st.columns(2)
             n_forn = c3.text_input("Fornecedor (Obrigatório):")
-            n_data = c4.date_input("Data da Compra", date.today())
+            n_data = c4.date_input("Data Compra", date.today())
             
             st.divider()
             st.write("📦 **Estoque Inicial:**")
@@ -379,25 +379,52 @@ elif menu == "💰 Caixa":
 elif menu == "👥 Clientes":
     st.title("👥 Gerenciar Clientes")
     df_c = carregar_dados_clientes()
-    if not df_c.empty:
-        lista_nomes_ordenada = sorted(df_c['nome'].astype(str).tolist())
-        sel = st.selectbox("Editar Cliente:", ["Selecione..."] + lista_nomes_ordenada)
-        
-        if sel != "Selecione...":
-            idx = df_c[df_c['nome']==sel].index[0]
-            with st.form("ed_c"):
-                nn = st.text_input("Nome:", value=df_c.iloc[idx]['nome'])
-                nt = st.text_input("Tel:", value=str(df_c.iloc[idx]['telefone']))
-                np = st.number_input("Pontos:", value=int(df_c.iloc[idx]['compras']))
-                b1, b2 = st.columns(2)
-                if b1.form_submit_button("💾 Salvar"):
-                    sheet_clientes.update_cell(idx+2, 1, nn); sheet_clientes.update_cell(idx+2, 2, nt); sheet_clientes.update_cell(idx+2, 3, np)
-                    limpar_cache()
-                    st.success("Salvo!"); time.sleep(1); st.rerun()
-                if b2.form_submit_button("🗑️ Excluir", type="primary"):
-                    sheet_clientes.delete_rows(int(idx+2))
-                    limpar_cache()
-                    st.rerun()
+    
+    # --- ALTERAÇÃO AQUI: Placar de Clientes ---
+    total_clientes = len(df_c) if not df_c.empty else 0
+    st.metric("Total de Clientes Cadastrados", total_clientes)
+    
+    # --- ALTERAÇÃO AQUI: Abas Inteligentes (Lista e Edição) ---
+    t_lista, t_editar = st.tabs(["📋 Lista de Pontos", "⚙️ Editar/Excluir"])
+    
+    with t_lista:
+        if not df_c.empty:
+            df_view = df_c[['nome', 'telefone', 'compras']].copy()
+            df_view.columns = ["Nome do Cliente", "Telefone", "Pontos Acumulados"]
+            st.dataframe(df_view, use_container_width=True, hide_index=True)
+        else:
+            st.info("Nenhum cliente cadastrado ainda.")
+
+    with t_editar:
+        if not df_c.empty:
+            lista_nomes_ordenada = sorted(df_c['nome'].astype(str).tolist())
+            sel = st.selectbox("Editar Cliente:", ["Selecione..."] + lista_nomes_ordenada)
+            
+            if sel != "Selecione...":
+                idx = df_c[df_c['nome']==sel].index[0]
+                pts_atuais = int(df_c.iloc[idx]['compras'])
+                
+                # --- ALTERAÇÃO AQUI: Destaque Individual de Pontos ---
+                if pts_atuais < 10:
+                    st.info(f"🏆 Pontuação Atual: **{pts_atuais} pontos** (Faltam {10-pts_atuais} para o prêmio!)")
+                else:
+                    st.info(f"🏆 Pontuação Atual: **{pts_atuais} pontos** - PRÊMIO DISPONÍVEL! 🎁")
+                
+                with st.form("ed_c"):
+                    nn = st.text_input("Nome:", value=df_c.iloc[idx]['nome'])
+                    nt = st.text_input("Tel:", value=str(df_c.iloc[idx]['telefone']))
+                    np = st.number_input("Pontos:", value=pts_atuais)
+                    b1, b2 = st.columns(2)
+                    if b1.form_submit_button("💾 Salvar"):
+                        sheet_clientes.update_cell(idx+2, 1, nn)
+                        sheet_clientes.update_cell(idx+2, 2, nt)
+                        sheet_clientes.update_cell(idx+2, 3, np)
+                        limpar_cache()
+                        st.success("Salvo!"); time.sleep(1); st.rerun()
+                    if b2.form_submit_button("🗑️ Excluir", type="primary"):
+                        sheet_clientes.delete_rows(int(idx+2))
+                        limpar_cache()
+                        st.rerun()
 
 # ==========================================
 # 📊 HISTÓRICOS
