@@ -221,12 +221,10 @@ if menu == "📦 Estoque":
     # --- EDITAR ---
     elif aba_estoque == "✏️ Editar/Excluir":
         if not df_est.empty:
-            # Puxa o nome inteligente para o Selectbox
             lista_produtos_ordenada = sorted(df_est['Nome_Exibicao'].astype(str).tolist())
             sel_e = st.selectbox("Selecione o produto para Editar:", ["Selecione..."] + lista_produtos_ordenada)
             
             if sel_e != "Selecione...":
-                # Acha a linha exata usando o nome inteligente
                 idx = df_est[df_est['Nome_Exibicao'] == sel_e].index[0]
                 row = df_est.iloc[idx]
                 
@@ -313,7 +311,6 @@ elif menu == "💰 Caixa":
         df_cli = carregar_dados_clientes()
         df_est = carregar_dados_estoque()
         
-        # Inteligência: Nome Composto também no Caixa
         if not df_est.empty:
             if 'ML' not in df_est.columns: df_est['ML'] = "-"
             if 'Tipo' not in df_est.columns: df_est['Tipo'] = "-"
@@ -337,7 +334,6 @@ elif menu == "💰 Caixa":
             p_sel = st.selectbox("Produto:", ["(Selecione...)"] + lista_produtos_caixa)
             
             if p_sel != "(Selecione...)":
-                # Busca pelo nome inteligente
                 idx_p = df_est[df_est['Nome_Exibicao'] == p_sel].index[0]
                 row_p = df_est.iloc[idx_p]
                 st.markdown(f'<div class="estoque-info">📊 EM ESTOQUE: {calc_fisico(int(cvt_num(row_p["Estoque"])), int(cvt_num(row_p.get("Qtd_Fardo", 12))))}</div>', unsafe_allow_html=True)
@@ -354,7 +350,6 @@ elif menu == "💰 Caixa":
                     
                     if atual >= baixa:
                         sheet_estoque.update_cell(idx_p+2, 6, atual - baixa)
-                        # Salva no histórico a venda do produto inteligente para relatórios perfeitos
                         sheet_hist_est.append_row([datetime.now().strftime('%d/%m/%Y %H:%M'), p_sel, "VENDA", baixa, salvar_com_ponto(baixa * cvt_num(df_est.iloc[idx_p]['Venda']))])
                     else: st.error(f"Estoque insuficiente! Você tem {atual} unidades."); st.stop()
 
@@ -380,17 +375,19 @@ elif menu == "👥 Clientes":
     st.title("👥 Gerenciar Clientes")
     df_c = carregar_dados_clientes()
     
-    # --- ALTERAÇÃO AQUI: Placar de Clientes ---
     total_clientes = len(df_c) if not df_c.empty else 0
     st.metric("Total de Clientes Cadastrados", total_clientes)
     
-    # --- ALTERAÇÃO AQUI: Abas Inteligentes (Lista e Edição) ---
-    t_lista, t_editar = st.tabs(["📋 Lista de Clientes", "⚙️ Editar/Excluir"])
+    t_lista, t_editar = st.tabs(["📋 Lista de Pontos", "⚙️ Editar/Excluir"])
     
     with t_lista:
         if not df_c.empty:
             df_view = df_c[['nome', 'telefone', 'compras']].copy()
             df_view.columns = ["Nome do Cliente", "Telefone", "Pontos Acumulados"]
+            
+            # --- CORREÇÃO AQUI: TABELA EM ORDEM ALFABÉTICA ---
+            df_view = df_view.sort_values(by="Nome do Cliente")
+            
             st.dataframe(df_view, use_container_width=True, hide_index=True)
         else:
             st.info("Nenhum cliente cadastrado ainda.")
@@ -404,7 +401,6 @@ elif menu == "👥 Clientes":
                 idx = df_c[df_c['nome']==sel].index[0]
                 pts_atuais = int(df_c.iloc[idx]['compras'])
                 
-                # --- ALTERAÇÃO AQUI: Destaque Individual de Pontos ---
                 if pts_atuais < 10:
                     st.info(f"🏆 Pontuação Atual: **{pts_atuais} pontos** (Faltam {10-pts_atuais} para o prêmio!)")
                 else:
