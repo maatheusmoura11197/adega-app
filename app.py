@@ -378,7 +378,7 @@ elif menu == "👥 Clientes":
     total_clientes = len(df_c) if not df_c.empty else 0
     st.metric("Total de Clientes Cadastrados", total_clientes)
     
-    t_lista, t_editar = st.tabs(["📋 Lista de Pontos", "⚙️ Editar/Excluir"])
+    t_lista, t_editar = st.tabs(["📋 Lista de Clientes", "⚙️ Editar/Excluir"])
     
     with t_lista:
         if not df_c.empty:
