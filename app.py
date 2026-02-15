@@ -385,7 +385,7 @@ elif menu == "👥 Clientes":
     st.metric("Total de Clientes Cadastrados", total_clientes)
     
     # --- ALTERAÇÃO AQUI: Abas Inteligentes (Lista e Edição) ---
-    t_lista, t_editar = st.tabs(["📋 Lista de Pontos", "⚙️ Editar/Excluir"])
+    t_lista, t_editar = st.tabs(["📋 Lista de Clientes", "⚙️ Editar/Excluir"])
     
     with t_lista:
         if not df_c.empty:
