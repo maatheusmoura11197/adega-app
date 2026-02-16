@@ -359,14 +359,15 @@ elif menu == "💰 Caixa":
         st.divider()
         st.write("🛒 **Adicionar Produtos ao Carrinho**")
         
-        # Inteligência e Ordem Alfabética dos Produtos
         if not df_est.empty:
             if 'ML' not in df_est.columns: df_est['ML'] = "-"
             if 'Tipo' not in df_est.columns: df_est['Tipo'] = "-"
             df_est['Nome_Exibicao'] = df_est['Nome'].astype(str) + " - " + df_est['Tipo'].astype(str) + " (" + df_est['ML'].astype(str) + ")"
             
             lista_produtos_caixa = sorted(df_est['Nome_Exibicao'].astype(str).tolist())
-            p_sel = st.selectbox("Selecione o Produto:", ["(Selecione...)"] + lista_produtos_caixa)
+            
+            # --- CHAVE DE MEMÓRIA PARA O SELECTBOX DE PRODUTO ---
+            p_sel = st.selectbox("Selecione o Produto:", ["(Selecione...)"] + lista_produtos_caixa, key="select_prod_caixa")
             
             if p_sel != "(Selecione...)":
                 idx_p = df_est[df_est['Nome_Exibicao'] == p_sel].index[0]
@@ -379,10 +380,10 @@ elif menu == "💰 Caixa":
                 st.markdown(f'<div class="estoque-info">📊 EM ESTOQUE: {calc_fisico(atual, ref)} | 💰 Preço Un: {para_real_visual(vlr_un)}</div>', unsafe_allow_html=True)
 
                 q1, q2 = st.columns(2)
+                # Chaves de memória para as quantidades
                 v_f = q1.number_input("Fardos:", min_value=0, key="c_fardos")
                 v_u = q2.number_input("Unidades:", min_value=0, key="c_unid")
                 
-                # Botão de Adicionar ao Carrinho
                 if st.button("➕ ADICIONAR AO CARRINHO"):
                     baixa = (v_f * ref) + v_u
                     
@@ -390,23 +391,24 @@ elif menu == "💰 Caixa":
                         st.warning("⚠️ Adicione pelo menos 1 unidade ou fardo para colocar no carrinho.")
                     elif atual >= baixa:
                         total_item_reais = baixa * vlr_un
-                        
-                        # Trava de Segurança: Checa se o item já está no carrinho
+                        sucesso_ao_adicionar = False
                         achou = False
+                        
+                        # Verifica se já está no carrinho
                         for item in st.session_state.carrinho:
                             if item["Produto"] == p_sel:
+                                achou = True
                                 if (item["Total Unid."] + baixa) > atual:
                                     st.error("⚠️ Estoque insuficiente para essa soma!")
-                                    achou = True
-                                    break
-                                item["Fardos"] += v_f
-                                item["Unidades"] += v_u
-                                item["Total Unid."] += baixa
-                                item["Valor R$"] += total_item_reais
-                                achou = True
-                                st.rerun()
+                                else:
+                                    item["Fardos"] += v_f
+                                    item["Unidades"] += v_u
+                                    item["Total Unid."] += baixa
+                                    item["Valor R$"] += total_item_reais
+                                    sucesso_ao_adicionar = True
+                                break
                         
-                        # Se não achou no carrinho, adiciona como novo
+                        # Adiciona como item novo se não estiver
                         if not achou:
                             st.session_state.carrinho.append({
                                 "Produto": p_sel,
@@ -415,7 +417,17 @@ elif menu == "💰 Caixa":
                                 "Total Unid.": baixa,
                                 "Valor R$": total_item_reais
                             })
-                            st.rerun()
+                            sucesso_ao_adicionar = True
+                            
+                        # --- LIMPEZA MÁGICA APÓS ADICIONAR ---
+                        if sucesso_ao_adicionar:
+                            if 'select_prod_caixa' in st.session_state:
+                                del st.session_state['select_prod_caixa']
+                            if 'c_fardos' in st.session_state:
+                                del st.session_state['c_fardos']
+                            if 'c_unid' in st.session_state:
+                                del st.session_state['c_unid']
+                            st.rerun() # Recarrega a tela com os campos limpos!
                     else: 
                         st.error(f"⚠️ Estoque insuficiente! Você tem apenas {atual} unidades disponíveis.")
 
@@ -426,17 +438,14 @@ elif menu == "💰 Caixa":
             st.write("---")
             st.subheader("🛍️ Seu Carrinho:")
             
-            # Exibe a Tabela do Carrinho
             df_carrinho = pd.DataFrame(st.session_state.carrinho)
             df_carrinho_vis = df_carrinho.copy()
             df_carrinho_vis['Valor R$'] = df_carrinho_vis['Valor R$'].apply(para_real_visual)
             st.dataframe(df_carrinho_vis, use_container_width=True)
             
-            # Cálculo do Valor Total da Compra
             valor_total_compra = sum(item['Valor R$'] for item in st.session_state.carrinho)
             st.success(f"💰 **VALOR TOTAL DA COMPRA: {para_real_visual(valor_total_compra)}**")
             
-            # Botões Finais
             col_fin, col_limp = st.columns(2)
             
             if col_limp.button("🗑️ Limpar Carrinho"):
@@ -446,7 +455,6 @@ elif menu == "💰 Caixa":
             if col_fin.button("✅ FINALIZAR VENDA COMPLETA", type="primary"):
                 tl = limpar_tel(t_c)
                 
-                # 1. Faz a baixa de todos os itens do carrinho no Estoque
                 with st.spinner("Registrando produtos e baixando estoque..."):
                     for item in st.session_state.carrinho:
                         nome_prod = item["Produto"]
@@ -458,12 +466,10 @@ elif menu == "💰 Caixa":
                             idx_p_planilha = match_prod.index[0]
                             estoque_atualizado = int(cvt_num(match_prod.iloc[0]['Estoque'])) - qtd_baixa
                             
-                            # Atualiza Planilha e Histórico
                             sheet_estoque.update_cell(idx_p_planilha+2, 6, estoque_atualizado)
                             sheet_hist_est.append_row([datetime.now().strftime('%d/%m/%Y %H:%M'), nome_prod, "VENDA", qtd_baixa, salvar_com_ponto(valor_total_item)])
-                            time.sleep(0.5) # Pausa pequena para o Google não bloquear
+                            time.sleep(0.5) 
 
-                # 2. Computa o Ponto de Fidelidade do Cliente (1 ponto por compra finalizada)
                 if not df_cli.empty and not df_cli[df_cli['telefone'].astype(str).apply(limpar_tel) == tl].empty:
                     match_cli = df_cli[df_cli['telefone'].astype(str).apply(limpar_tel) == tl]
                     pts = int(match_cli.iloc[0]['compras']) + 1
@@ -475,7 +481,6 @@ elif menu == "💰 Caixa":
                 sheet_hist_cli.append_row([datetime.now().strftime('%d/%m/%Y %H:%M'), n_c, tl, pts])
                 msg, btn = gerar_mensagem(n_c, pts)
                 
-                # 3. Limpa o sistema e mostra sucesso
                 st.session_state.carrinho = []
                 limpar_cache()
                 
