@@ -188,7 +188,7 @@ if menu == "📦 Estoque":
             n_ml = c_t2.text_input("Se escolheu 'Outros', digite o ML:")
 
             c1, c2 = st.columns(2)
-            n_custo = c1.text_input("Custo Unitário R$ (Obrigatório color: white;):", placeholder="0.00")
+            n_custo = c1.text_input("Custo Unitário R$ (Obrigatório): color: Red;", placeholder="0.00")
             n_venda = c2.text_input("Venda Unitária R$ (Obrigatório):", placeholder="00.00")
             
             # --- Fornecedores em Ordem Alfabética e Lógica Anti-Travamento ---
