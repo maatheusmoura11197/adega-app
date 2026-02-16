@@ -122,7 +122,7 @@ def calc_fisico(total, ref_fardo):
 
 def gerar_mensagem(nome_cliente, pontos):
     nome = nome_cliente.split()[0].capitalize()
-    if pontos == 1: return f"Oi, {nome}! ✨\nacabamos de abrir o seu cartão fidelidade na Adega do Barão e você já garantiu o seu primeiro ponto. 🍷
+    if pontos == 1: return f"Oi, {nome}! ✨acabamos de abrir o seu cartão fidelidade na Adega do Barão e você já garantiu o seu primeiro ponto. 🍷
 Ao completar 10 compras, você ganhará um prêmio especial. Além disso, a adega convida você a avaliar o atendimento no aplicativo *Já Pediu.🌟🍻* 🍷", "Enviar Boas-Vindas 🎉"
     elif 1 < pontos < 10: return f"Opa, {nome}! 👊\nCompra registrada! Agora você tem *{pontos} pontos*. ✨\nFaltam só {10-pontos} para o prêmio! Ah e não esquece de avaliar o atendimento no aplicativo *Já Pediu.🌟🍻*! 🍻", f"Enviar Saldo ({pontos}/10) 📲"
     else: return f"PARABÉNS, {nome}!!! ✨🏆\nVocê completou 10 pontos e ganhou um **DESCONTO DE 20%** hoje! Aproveite! 🥳🍷", "🏆 ENVIAR PRÊMIO!"
