@@ -185,7 +185,7 @@ if menu == "📦 Estoque":
             
             lista_ml = ["200ml", "210ml", "269ml", "300ml", "330ml", "350ml", "473ml", "550ml", "600ml", "950ml", "1 Litro", "Outros"]
             sel_ml = c_t2.selectbox("Volume (ML):", lista_ml)
-            n_ml = c_t2.text_input("Se escolheu 'Outros', digite o ML aqui:")
+            n_ml = c_t2.text_input("Se escolheu 'Outros', digite o ML:")
 
             c1, c2 = st.columns(2)
             n_custo = c1.text_input("Custo Unitário R$ (Obrigatório):", placeholder="0.00")
@@ -195,7 +195,7 @@ if menu == "📦 Estoque":
             c3, c4 = st.columns(2)
             lista_fornecedores = ["Ambev", "Daterra", "Jurerê", "Mix Matheus", "Zé Delivery", "Outros"]
             sel_forn = c3.selectbox("Fornecedor:", lista_fornecedores)
-            n_forn_custom = c4.text_input("Se 'Outros', digite o Fornecedor aqui:")
+            n_forn_custom = c4.text_input("Se escolheu 'Outros', digite o Fornecedor:")
             
             n_data = st.date_input("Data Compra", date.today())
             
