@@ -145,6 +145,7 @@ if menu == "📦 Estoque":
     
     df_est = carregar_dados_estoque()
     
+    # --- INTELIGÊNCIA: NOME DE EXIBIÇÃO COMPOSTO ---
     if not df_est.empty:
         if 'ML' not in df_est.columns: df_est['ML'] = "-"
         if 'Tipo' not in df_est.columns: df_est['Tipo'] = "-"
@@ -176,26 +177,24 @@ if menu == "📦 Estoque":
     elif aba_estoque == "🆕 Cadastrar Novo":
         st.subheader("Cadastrar Produto")
         with st.form("form_novo_produto", clear_on_submit=True):
-            n_nome = st.text_input("Nome do Produto (Obrigatório):").upper()
+            n_nome = st.text_input("Nome do Produto :red[(Obrigatório)]:").upper()
             
             c_t1, c_t2 = st.columns(2)
-            # Tipos em Ordem Alfabética
             lista_tipos = ["GARRAFA 600ML", "LATA", "LITRÃO", "LONG NECK", "OUTROS"]
             n_tipo = c_t1.selectbox("Tipo:", lista_tipos)
             
             lista_ml = ["200ml", "210ml", "269ml", "300ml", "330ml", "350ml", "473ml", "550ml", "600ml", "950ml", "1 Litro", "Outros"]
             sel_ml = c_t2.selectbox("Volume (ML):", lista_ml)
-            n_ml = c_t2.text_input("Se escolheu 'Outros', digite o ML:")
+            n_ml = c_t2.text_input("Se escolheu 'Outros', digite o ML :red[(Obrigatório)]:")
 
             c1, c2 = st.columns(2)
-            n_custo = c1.text_input("Custo Unitário R$ (Obrigatório): color: Red;", placeholder="0.00")
-            n_venda = c2.text_input("Venda Unitária R$ (Obrigatório):", placeholder="00.00")
+            n_custo = c1.text_input("Custo Unitário R$ :red[(Obrigatório)]:", placeholder="0.00")
+            n_venda = c2.text_input("Venda Unitária R$ :red[(Obrigatório)]:", placeholder="00.00")
             
-            # --- Fornecedores em Ordem Alfabética e Lógica Anti-Travamento ---
             c3, c4 = st.columns(2)
             lista_fornecedores = ["Ambev", "Daterra", "Jurerê", "Mix Matheus", "Zé Delivery", "Outros"]
-            sel_forn = c3.selectbox("Fornecedor:", lista_fornecedores)
-            n_forn_custom = c4.text_input("Se escolheu 'Outros', digite o Fornecedor:")
+            sel_forn = c3.selectbox("Fornecedor :red[(Obrigatório)]:", lista_fornecedores)
+            n_forn_custom = c4.text_input("Se escolheu 'Outros', digite o Fornecedor :red[(Obrigatório)]:")
             
             n_data = st.date_input("Data Compra", date.today())
             
@@ -236,10 +235,9 @@ if menu == "📦 Estoque":
                 row = df_est.iloc[idx]
                 
                 with st.form("form_editar_produto"):
-                    novo_nome = st.text_input("Nome do Produto (na Planilha):", value=str(row['Nome'])).upper()
+                    novo_nome = st.text_input("Nome do Produto :red[(Obrigatório)]:", value=str(row['Nome'])).upper()
                     
                     c_tipo, c_ml = st.columns(2)
-                    # Tipos em Ordem Alfabética
                     list_tipos = ["GARRAFA 600ML", "LATA", "LITRÃO", "LONG NECK", "OUTROS"]
                     t_atual = row.get('Tipo', 'LATA')
                     idx_t = list_tipos.index(t_atual) if t_atual in list_tipos else 1
@@ -249,20 +247,19 @@ if menu == "📦 Estoque":
                     ml_banco = str(row.get('ML', '350ml'))
                     idx_ml_ini = lista_ml.index(ml_banco) if ml_banco in lista_ml else 11
                     sel_ml_edit = c_ml.selectbox("Volume (ML):", lista_ml, index=idx_ml_ini)
-                    final_ml_txt = c_ml.text_input("Se 'Outros', digite o ML:", value=ml_banco if ml_banco not in lista_ml else "")
+                    final_ml_txt = c_ml.text_input("Se 'Outros', digite o ML :red[(Obrigatório)]:", value=ml_banco if ml_banco not in lista_ml else "")
 
                     c_a, c_b = st.columns(2)
-                    v_venda = c_a.text_input("Venda (R$):", value=str(row['Venda']))
-                    v_custo = c_b.text_input("Custo (R$):", value=str(row['Custo']))
+                    v_venda = c_a.text_input("Venda (R$) :red[(Obrigatório)]:", value=str(row['Venda']))
+                    v_custo = c_b.text_input("Custo (R$) :red[(Obrigatório)]:", value=str(row['Custo']))
                     
-                    # --- Fornecedores em Ordem Alfabética e Lógica Anti-Travamento ---
                     c_f1, c_f2 = st.columns(2)
                     lista_fornecedores = ["Ambev", "Daterra", "Jurerê", "Mix Matheus", "Zé Delivery", "Outros"]
                     forn_atual = str(row.get('Fornecedor', ''))
                     idx_forn = lista_fornecedores.index(forn_atual) if forn_atual in lista_fornecedores else 5
                     
-                    sel_forn_edit = c_f1.selectbox("Fornecedor:", lista_fornecedores, index=idx_forn)
-                    final_forn_txt = c_f2.text_input("Se 'Outros', digite o Fornecedor aqui:", value=forn_atual if forn_atual not in lista_fornecedores else "")
+                    sel_forn_edit = c_f1.selectbox("Fornecedor :red[(Obrigatório)]:", lista_fornecedores, index=idx_forn)
+                    final_forn_txt = c_f2.text_input("Se 'Outros', digite o Fornecedor :red[(Obrigatório)]:", value=forn_atual if forn_atual not in lista_fornecedores else "")
                     
                     st.write("---")
                     st.write("📦 **Controle de Estoque:**")
@@ -284,13 +281,15 @@ if menu == "📦 Estoque":
                     
                     if btn_salvar:
                         forn_final_salvar = final_forn_txt if sel_forn_edit == "Outros" else sel_forn_edit
+                        ml_save = final_ml_txt if sel_ml_edit == "Outros" else sel_ml_edit
                         
                         if not novo_nome:
                             st.error("⚠️ O nome do produto não pode ficar vazio!")
                         elif not forn_final_salvar:
                             st.error("⚠️ O fornecedor não pode ficar vazio!")
+                        elif sel_ml_edit == "Outros" and not ml_save:
+                            st.error("⚠️ O ML não pode ficar vazio!")
                         else:
-                            ml_save = final_ml_txt if sel_ml_edit == "Outros" else sel_ml_edit
                             novo_tot = estoque_editado + (add_f * ref_fardo) + add_u
                             
                             sheet_estoque.update_cell(idx+2, 1, novo_nome)
@@ -446,7 +445,7 @@ elif menu == "👥 Clientes":
 # ==========================================
 # 📊 HISTÓRICOS
 # ==========================================
-elif menu == "📊 Históricos":
+elif menu == "📊 HISTÓRICOS":
     st.title("📊 Relatórios")
     aba_hist = st.radio("Selecione o Relatório:", ["Vendas (Clientes)", "Movim. Estoque"], horizontal=True, label_visibility="collapsed")
     st.divider()
