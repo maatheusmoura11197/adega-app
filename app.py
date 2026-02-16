@@ -145,7 +145,6 @@ if menu == "📦 Estoque":
     
     df_est = carregar_dados_estoque()
     
-    # --- INTELIGÊNCIA: NOME DE EXIBIÇÃO COMPOSTO ---
     if not df_est.empty:
         if 'ML' not in df_est.columns: df_est['ML'] = "-"
         if 'Tipo' not in df_est.columns: df_est['Tipo'] = "-"
@@ -167,6 +166,7 @@ if menu == "📦 Estoque":
             df_vis['Lucro (R$)'] = df_vis['Lucro Un.'].apply(para_real_visual)
             df_vis['Físico'] = df_vis.apply(lambda r: calc_fisico(int(cvt_num(r['Estoque'])), int(cvt_num(r.get('Qtd_Fardo', 12)))), axis=1)
             
+            # Ordenação Alfabética Rigorosa
             df_vis = df_vis.sort_values(by='Nome')
             st.dataframe(df_vis[['Nome', 'Tipo', 'ML', 'Físico', 'Custo (R$)', 'Venda (R$)', 'Lucro (R$)', 'Fornecedor', 'Data Compra']], use_container_width=True)
         else:
@@ -179,7 +179,10 @@ if menu == "📦 Estoque":
             n_nome = st.text_input("Nome do Produto (Obrigatório):").upper()
             
             c_t1, c_t2 = st.columns(2)
-            n_tipo = c_t1.selectbox("Tipo:", ["LATA", "LONG NECK", "GARRAFA 600ML", "LITRÃO", "OUTROS"])
+            # Tipos em Ordem Alfabética
+            lista_tipos = ["GARRAFA 600ML", "LATA", "LITRÃO", "LONG NECK", "OUTROS"]
+            n_tipo = c_t1.selectbox("Tipo:", lista_tipos)
+            
             lista_ml = ["200ml", "210ml", "269ml", "300ml", "330ml", "350ml", "473ml", "550ml", "600ml", "950ml", "1 Litro", "Outros"]
             sel_ml = c_t2.selectbox("Volume (ML):", lista_ml)
             n_ml = c_t2.text_input("Se escolheu 'Outros', digite o ML aqui:")
@@ -188,17 +191,13 @@ if menu == "📦 Estoque":
             n_custo = c1.text_input("Custo Unitário R$ (Obrigatório):", placeholder="0.00")
             n_venda = c2.text_input("Venda Unitária R$ (Obrigatório):", placeholder="00.00")
             
+            # --- Fornecedores em Ordem Alfabética e Lógica Anti-Travamento ---
             c3, c4 = st.columns(2)
+            lista_fornecedores = ["Ambev", "Daterra", "Jurerê", "Mix Matheus", "Zé Delivery", "Outros"]
+            sel_forn = c3.selectbox("Fornecedor:", lista_fornecedores)
+            n_forn_custom = c4.text_input("Se 'Outros', digite o Fornecedor aqui:")
             
-            # --- ALTERAÇÃO: FORNECEDOR EM LISTA NO CADASTRO ---
-            lista_fornecedores = ["Mix Matheus", "Daterra", "Jurerê", "Ambev", "Zé Delivery", "Outros"]
-            sel_forn_novo = c3.selectbox("Fornecedor:", lista_fornecedores)
-            if sel_forn_novo == "Outros":
-                n_forn = c3.text_input("Digite o Fornecedor (Obrigatório):")
-            else:
-                n_forn = sel_forn_novo
-                
-            n_data = c4.date_input("Data Compra", date.today())
+            n_data = st.date_input("Data Compra", date.today())
             
             st.divider()
             st.write("📦 **Estoque Inicial:**")
@@ -211,17 +210,18 @@ if menu == "📦 Estoque":
             if st.form_submit_button("✅ CADASTRAR PRODUTO", type="primary"):
                 qtd_final = qtd_inicial * n_ref if tipo_compra == "Fardo Fechado" else qtd_inicial
                 ml_final = n_ml if sel_ml == "Outros" else sel_ml
+                forn_final = n_forn_custom if sel_forn == "Outros" else sel_forn
                 
                 erro = False
                 if not n_nome: st.error("⚠️ Nome Obrigatório"); erro = True
                 if not n_custo: st.error("⚠️ Custo Obrigatório"); erro = True
                 if not n_venda: st.error("⚠️ Venda Obrigatória"); erro = True
-                if not n_forn: st.error("⚠️ Fornecedor Obrigatório"); erro = True
+                if not forn_final: st.error("⚠️ Fornecedor Obrigatório"); erro = True
                 if sel_ml == "Outros" and not n_ml: st.error("⚠️ Digite o ML"); erro = True
                 
                 if not erro:
-                    sheet_estoque.append_row([n_nome, n_tipo, n_forn, salvar_com_ponto(cvt_num(n_custo)), salvar_com_ponto(cvt_num(n_venda)), qtd_final, n_data.strftime('%d/%m/%Y'), n_ref, ml_final])
-                    sheet_hist_est.append_row([datetime.now().strftime('%d/%m/%Y %H:%M'), n_nome, "NOVO", qtd_final, n_forn])
+                    sheet_estoque.append_row([n_nome, n_tipo, forn_final, salvar_com_ponto(cvt_num(n_custo)), salvar_com_ponto(cvt_num(n_venda)), qtd_final, n_data.strftime('%d/%m/%Y'), n_ref, ml_final])
+                    sheet_hist_est.append_row([datetime.now().strftime('%d/%m/%Y %H:%M'), n_nome, "NOVO", qtd_final, forn_final])
                     limpar_cache()
                     st.success(f"✅ O produto '{n_nome}' foi cadastrado com sucesso! A tela já está limpa para o próximo.")
 
@@ -239,8 +239,11 @@ if menu == "📦 Estoque":
                     novo_nome = st.text_input("Nome do Produto (na Planilha):", value=str(row['Nome'])).upper()
                     
                     c_tipo, c_ml = st.columns(2)
-                    list_tipos = ["LATA", "LONG NECK", "GARRAFA 600ML", "LITRÃO", "OUTROS"]
-                    novo_tipo = c_tipo.selectbox("Tipo:", list_tipos, index=list_tipos.index(row.get('Tipo', 'LATA')) if row.get('Tipo', 'LATA') in list_tipos else 0)
+                    # Tipos em Ordem Alfabética
+                    list_tipos = ["GARRAFA 600ML", "LATA", "LITRÃO", "LONG NECK", "OUTROS"]
+                    t_atual = row.get('Tipo', 'LATA')
+                    idx_t = list_tipos.index(t_atual) if t_atual in list_tipos else 1
+                    novo_tipo = c_tipo.selectbox("Tipo:", list_tipos, index=idx_t)
                     
                     lista_ml = ["200ml", "210ml", "269ml", "300ml", "330ml", "350ml", "473ml", "550ml", "600ml", "950ml", "1 Litro", "Outros"]
                     ml_banco = str(row.get('ML', '350ml'))
@@ -252,20 +255,14 @@ if menu == "📦 Estoque":
                     v_venda = c_a.text_input("Venda (R$):", value=str(row['Venda']))
                     v_custo = c_b.text_input("Custo (R$):", value=str(row['Custo']))
                     
-                    # --- ALTERAÇÃO: FORNECEDOR EM LISTA NO EDITAR ---
-                    lista_fornecedores = ["Mix Matheus", "Daterra", "Jurerê", "Ambev", "Zé Delivery", "Outros"]
+                    # --- Fornecedores em Ordem Alfabética e Lógica Anti-Travamento ---
+                    c_f1, c_f2 = st.columns(2)
+                    lista_fornecedores = ["Ambev", "Daterra", "Jurerê", "Mix Matheus", "Zé Delivery", "Outros"]
                     forn_atual = str(row.get('Fornecedor', ''))
-                    
-                    # Acha a posição do fornecedor ou joga para "Outros" se for antigo/diferente
                     idx_forn = lista_fornecedores.index(forn_atual) if forn_atual in lista_fornecedores else 5
                     
-                    c_f1, c_f2 = st.columns(2)
                     sel_forn_edit = c_f1.selectbox("Fornecedor:", lista_fornecedores, index=idx_forn)
-                    
-                    if sel_forn_edit == "Outros":
-                        v_forn_final = c_f2.text_input("Qual Fornecedor?", value=forn_atual if forn_atual not in lista_fornecedores else "")
-                    else:
-                        v_forn_final = sel_forn_edit
+                    final_forn_txt = c_f2.text_input("Se 'Outros', digite o Fornecedor aqui:", value=forn_atual if forn_atual not in lista_fornecedores else "")
                     
                     st.write("---")
                     st.write("📦 **Controle de Estoque:**")
@@ -286,9 +283,11 @@ if menu == "📦 Estoque":
                     btn_excluir = b_exc.form_submit_button("🗑️ EXCLUIR PRODUTO")
                     
                     if btn_salvar:
+                        forn_final_salvar = final_forn_txt if sel_forn_edit == "Outros" else sel_forn_edit
+                        
                         if not novo_nome:
                             st.error("⚠️ O nome do produto não pode ficar vazio!")
-                        elif not v_forn_final:
+                        elif not forn_final_salvar:
                             st.error("⚠️ O fornecedor não pode ficar vazio!")
                         else:
                             ml_save = final_ml_txt if sel_ml_edit == "Outros" else sel_ml_edit
@@ -296,7 +295,7 @@ if menu == "📦 Estoque":
                             
                             sheet_estoque.update_cell(idx+2, 1, novo_nome)
                             sheet_estoque.update_cell(idx+2, 2, novo_tipo)
-                            sheet_estoque.update_cell(idx+2, 3, v_forn_final) # Salva o fornecedor da lista ou o digitado
+                            sheet_estoque.update_cell(idx+2, 3, forn_final_salvar)
                             sheet_estoque.update_cell(idx+2, 4, salvar_com_ponto(cvt_num(v_custo)))
                             sheet_estoque.update_cell(idx+2, 5, salvar_com_ponto(cvt_num(v_venda)))
                             sheet_estoque.update_cell(idx+2, 6, novo_tot)
@@ -305,7 +304,7 @@ if menu == "📦 Estoque":
                             except: pass
                             
                             if (add_f * ref_fardo) + add_u > 0: 
-                                sheet_hist_est.append_row([datetime.now().strftime('%d/%m/%Y %H:%M'), sel_e, "ENTRADA", (add_f * ref_fardo) + add_u, f"Forn: {v_forn_final}"])
+                                sheet_hist_est.append_row([datetime.now().strftime('%d/%m/%Y %H:%M'), sel_e, "ENTRADA", (add_f * ref_fardo) + add_u, f"Forn: {forn_final_salvar}"])
                             elif estoque_editado != estoque_atual_num:
                                 diff = estoque_editado - estoque_atual_num
                                 tipo_ajuste = "AJUSTE (+)" if diff > 0 else "AJUSTE (-)"
