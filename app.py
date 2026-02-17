@@ -176,7 +176,7 @@ if menu == "📦 Estoque":
     elif aba_estoque == "🆕 Cadastrar Novo":
         st.subheader("Cadastrar Produto")
         with st.form("form_novo_produto", clear_on_submit=True):
-            n_nome = st.text_input("Nome do Produto :red[(Obrigatório)]:").upper()
+            n_nome = st.text_input("Nome do Produto :red[(Obrigatório)]:", key="novo_nome_add").upper()
             
             c_t1, c_t2 = st.columns(2)
             lista_tipos = ["GARRAFA 600ML", "LATA", "LITRÃO", "LONG NECK", "OUTROS"]
@@ -184,11 +184,7 @@ if menu == "📦 Estoque":
             
             lista_ml = ["200ml", "210ml", "269ml", "300ml", "330ml", "350ml", "473ml", "550ml", "600ml", "950ml", "1 Litro", "Outros"]
             sel_ml = c_t2.selectbox("Volume (ML):", lista_ml)
-            
-            # Controle de Exibição do ML Personalizado
-            n_ml = ""
-            if sel_ml == "Outros":
-                n_ml = c_t2.text_input("Digite o ML :red[(Obrigatório)]:")
+            n_ml = c_t2.text_input("Se escolheu 'Outros', digite o ML :red[(Obrigatório)]:")
 
             c1, c2 = st.columns(2)
             n_custo = c1.text_input("Custo Unitário R$ :red[(Obrigatório)]:", placeholder="0.00")
@@ -197,11 +193,7 @@ if menu == "📦 Estoque":
             c3, c4 = st.columns(2)
             lista_fornecedores = ["Ambev", "Daterra", "Jurerê", "Mix Matheus", "Zé Delivery", "Outros"]
             sel_forn = c3.selectbox("Fornecedor :red[(Obrigatório)]:", lista_fornecedores)
-            
-            # Controle de Exibição do Fornecedor Personalizado (MÁGICA AQUI)
-            n_forn_custom = ""
-            if sel_forn == "Outros":
-                n_forn_custom = c4.text_input("Digite o Fornecedor :red[(Obrigatório)]:")
+            n_forn_custom = c4.text_input("Se escolheu 'Outros', digite o Fornecedor :red[(Obrigatório)]:")
             
             n_data = st.date_input("Data Compra", date.today())
             
@@ -214,6 +206,7 @@ if menu == "📦 Estoque":
             qtd_inicial = col_b.number_input("Qtd Fardos / Unidades:" , min_value=0)
             
             if st.form_submit_button("✅ CADASTRAR PRODUTO", type="primary"):
+                # A MÁGICA: Se marcou da lista, ignora o que está na caixa de texto. Se marcou outros, pega o da caixa.
                 qtd_final = qtd_inicial * n_ref if tipo_compra == "Fardo Fechado" else qtd_inicial
                 ml_final = n_ml if sel_ml == "Outros" else sel_ml
                 forn_final = n_forn_custom if sel_forn == "Outros" else sel_forn
@@ -235,16 +228,15 @@ if menu == "📦 Estoque":
     elif aba_estoque == "✏️ Editar/Excluir":
         if not df_est.empty:
             lista_produtos_ordenada = sorted(df_est['Nome_Exibicao'].astype(str).tolist())
-            
-            # A seleção do produto fica FORA do form para carregar os dados em tempo real
             sel_e = st.selectbox("Selecione o produto para Editar:", ["Selecione..."] + lista_produtos_ordenada)
             
             if sel_e != "Selecione...":
                 idx = df_est[df_est['Nome_Exibicao'] == sel_e].index[0]
                 row = df_est.iloc[idx]
                 
-                # ADICIONADO: clear_on_submit=True limpa os dados após salvar
-                with st.form("form_editar_produto", clear_on_submit=True):
+                # A MÁGICA DO FANTASMA: Colocamos o idx no nome do formulário. 
+                # Cada produto ganha um formulário virgem e limpo quando é selecionado!
+                with st.form(f"form_editar_produto_{idx}", clear_on_submit=True):
                     novo_nome = st.text_input("Nome do Produto :red[(Obrigatório)]:", value=str(row['Nome'])).upper()
                     
                     c_tipo, c_ml = st.columns(2)
@@ -257,10 +249,7 @@ if menu == "📦 Estoque":
                     ml_banco = str(row.get('ML', '350ml'))
                     idx_ml_ini = lista_ml.index(ml_banco) if ml_banco in lista_ml else 11
                     sel_ml_edit = c_ml.selectbox("Volume (ML):", lista_ml, index=idx_ml_ini)
-                    
-                    final_ml_txt = ""
-                    if sel_ml_edit == "Outros":
-                        final_ml_txt = c_ml.text_input("Digite o ML :red[(Obrigatório)]:", value=ml_banco if ml_banco not in lista_ml else "")
+                    final_ml_txt = c_ml.text_input("Se 'Outros', digite o ML :red[(Obrigatório)]:", value=ml_banco if ml_banco not in lista_ml else "")
 
                     c_a, c_b = st.columns(2)
                     v_venda = c_a.text_input("Venda (R$) :red[(Obrigatório)]:", value=str(row['Venda']))
@@ -272,11 +261,7 @@ if menu == "📦 Estoque":
                     idx_forn = lista_fornecedores.index(forn_atual) if forn_atual in lista_fornecedores else 5
                     
                     sel_forn_edit = c_f1.selectbox("Fornecedor :red[(Obrigatório)]:", lista_fornecedores, index=idx_forn)
-                    
-                    # Controle de Exibição do Fornecedor Personalizado (MÁGICA AQUI)
-                    final_forn_txt = ""
-                    if sel_forn_edit == "Outros":
-                        final_forn_txt = c_f2.text_input("Digite o Fornecedor :red[(Obrigatório)]:", value=forn_atual if forn_atual not in lista_fornecedores else "")
+                    final_forn_txt = c_f2.text_input("Se 'Outros', digite o Fornecedor :red[(Obrigatório)]:", value=forn_atual if forn_atual not in lista_fornecedores else "")
                     
                     st.write("---")
                     st.write("📦 **Controle de Estoque:**")
@@ -297,6 +282,7 @@ if menu == "📦 Estoque":
                     btn_excluir = b_exc.form_submit_button("🗑️ EXCLUIR PRODUTO")
                     
                     if btn_salvar:
+                        # O CÉREBRO: Se escolheu na lista (ex: Ambev), ele IGNORA o que estiver escrito na caixinha de "Outros".
                         forn_final_salvar = final_forn_txt if sel_forn_edit == "Outros" else sel_forn_edit
                         ml_save = final_ml_txt if sel_ml_edit == "Outros" else sel_ml_edit
                         
