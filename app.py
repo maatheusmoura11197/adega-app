@@ -29,7 +29,7 @@ st.markdown(f"""
 SENHA_DO_SISTEMA = "adega123"
 
 if 'logado' not in st.session_state: st.session_state.logado = False
-if 'carrinho' not in st.session_state: st.session_state.carrinho = [] # Criando o Carrinho de Compras
+if 'carrinho' not in st.session_state: st.session_state.carrinho = []
 
 if not st.session_state.logado:
     st.markdown("<br><br><h1 style='text-align: center;'>🔒 Adega do Barão</h1>", unsafe_allow_html=True)
@@ -146,11 +146,9 @@ if menu == "📦 Estoque":
     
     df_est = carregar_dados_estoque()
     
-    # --- INTELIGÊNCIA: NOME DE EXIBIÇÃO COMPOSTO ---
     if not df_est.empty:
         if 'ML' not in df_est.columns: df_est['ML'] = "-"
         if 'Tipo' not in df_est.columns: df_est['Tipo'] = "-"
-        # Cria a coluna inteligente "Nome_Exibicao"
         df_est['Nome_Exibicao'] = df_est['Nome'].astype(str) + " - " + df_est['Tipo'].astype(str) + " (" + df_est['ML'].astype(str) + ")"
     
     aba_estoque = st.radio("Selecione a tela:", ["📋 Lista Detalhada", "🆕 Cadastrar Novo", "✏️ Editar/Excluir"], horizontal=True, label_visibility="collapsed")
@@ -169,7 +167,6 @@ if menu == "📦 Estoque":
             df_vis['Lucro (R$)'] = df_vis['Lucro Un.'].apply(para_real_visual)
             df_vis['Físico'] = df_vis.apply(lambda r: calc_fisico(int(cvt_num(r['Estoque'])), int(cvt_num(r.get('Qtd_Fardo', 12)))), axis=1)
             
-            # Ordenação Alfabética Rigorosa
             df_vis = df_vis.sort_values(by='Nome')
             st.dataframe(df_vis[['Nome', 'Tipo', 'ML', 'Físico', 'Custo (R$)', 'Venda (R$)', 'Lucro (R$)', 'Fornecedor', 'Data Compra']], use_container_width=True)
         else:
@@ -182,23 +179,29 @@ if menu == "📦 Estoque":
             n_nome = st.text_input("Nome do Produto :red[(Obrigatório)]:").upper()
             
             c_t1, c_t2 = st.columns(2)
-            # Tipos em Ordem Alfabética
             lista_tipos = ["GARRAFA 600ML", "LATA", "LITRÃO", "LONG NECK", "OUTROS"]
             n_tipo = c_t1.selectbox("Tipo:", lista_tipos)
             
             lista_ml = ["200ml", "210ml", "269ml", "300ml", "330ml", "350ml", "473ml", "550ml", "600ml", "950ml", "1 Litro", "Outros"]
             sel_ml = c_t2.selectbox("Volume (ML):", lista_ml)
-            n_ml = c_t2.text_input("Se escolheu 'Outros', digite o ML :red[(Obrigatório)]:")
+            
+            # Controle de Exibição do ML Personalizado
+            n_ml = ""
+            if sel_ml == "Outros":
+                n_ml = c_t2.text_input("Digite o ML :red[(Obrigatório)]:")
 
             c1, c2 = st.columns(2)
             n_custo = c1.text_input("Custo Unitário R$ :red[(Obrigatório)]:", placeholder="0.00")
             n_venda = c2.text_input("Venda Unitária R$ :red[(Obrigatório)]:", placeholder="00.00")
             
-            # --- Fornecedores em Ordem Alfabética e Lógica Anti-Travamento ---
             c3, c4 = st.columns(2)
             lista_fornecedores = ["Ambev", "Daterra", "Jurerê", "Mix Matheus", "Zé Delivery", "Outros"]
             sel_forn = c3.selectbox("Fornecedor :red[(Obrigatório)]:", lista_fornecedores)
-            n_forn_custom = c4.text_input("Se escolheu 'Outros', digite o Fornecedor :red[(Obrigatório)]:")
+            
+            # Controle de Exibição do Fornecedor Personalizado (MÁGICA AQUI)
+            n_forn_custom = ""
+            if sel_forn == "Outros":
+                n_forn_custom = c4.text_input("Digite o Fornecedor :red[(Obrigatório)]:")
             
             n_data = st.date_input("Data Compra", date.today())
             
@@ -232,17 +235,19 @@ if menu == "📦 Estoque":
     elif aba_estoque == "✏️ Editar/Excluir":
         if not df_est.empty:
             lista_produtos_ordenada = sorted(df_est['Nome_Exibicao'].astype(str).tolist())
+            
+            # A seleção do produto fica FORA do form para carregar os dados em tempo real
             sel_e = st.selectbox("Selecione o produto para Editar:", ["Selecione..."] + lista_produtos_ordenada)
             
             if sel_e != "Selecione...":
                 idx = df_est[df_est['Nome_Exibicao'] == sel_e].index[0]
                 row = df_est.iloc[idx]
                 
-                with st.form("form_editar_produto"):
+                # ADICIONADO: clear_on_submit=True limpa os dados após salvar
+                with st.form("form_editar_produto", clear_on_submit=True):
                     novo_nome = st.text_input("Nome do Produto :red[(Obrigatório)]:", value=str(row['Nome'])).upper()
                     
                     c_tipo, c_ml = st.columns(2)
-                    # Tipos em Ordem Alfabética
                     list_tipos = ["GARRAFA 600ML", "LATA", "LITRÃO", "LONG NECK", "OUTROS"]
                     t_atual = row.get('Tipo', 'LATA')
                     idx_t = list_tipos.index(t_atual) if t_atual in list_tipos else 1
@@ -252,20 +257,26 @@ if menu == "📦 Estoque":
                     ml_banco = str(row.get('ML', '350ml'))
                     idx_ml_ini = lista_ml.index(ml_banco) if ml_banco in lista_ml else 11
                     sel_ml_edit = c_ml.selectbox("Volume (ML):", lista_ml, index=idx_ml_ini)
-                    final_ml_txt = c_ml.text_input("Se 'Outros', digite o ML :red[(Obrigatório)]:", value=ml_banco if ml_banco not in lista_ml else "")
+                    
+                    final_ml_txt = ""
+                    if sel_ml_edit == "Outros":
+                        final_ml_txt = c_ml.text_input("Digite o ML :red[(Obrigatório)]:", value=ml_banco if ml_banco not in lista_ml else "")
 
                     c_a, c_b = st.columns(2)
                     v_venda = c_a.text_input("Venda (R$) :red[(Obrigatório)]:", value=str(row['Venda']))
                     v_custo = c_b.text_input("Custo (R$) :red[(Obrigatório)]:", value=str(row['Custo']))
                     
-                    # --- Fornecedores em Ordem Alfabética e Lógica Anti-Travamento ---
                     c_f1, c_f2 = st.columns(2)
                     lista_fornecedores = ["Ambev", "Daterra", "Jurerê", "Mix Matheus", "Zé Delivery", "Outros"]
                     forn_atual = str(row.get('Fornecedor', ''))
                     idx_forn = lista_fornecedores.index(forn_atual) if forn_atual in lista_fornecedores else 5
                     
                     sel_forn_edit = c_f1.selectbox("Fornecedor :red[(Obrigatório)]:", lista_fornecedores, index=idx_forn)
-                    final_forn_txt = c_f2.text_input("Se 'Outros', digite o Fornecedor :red[(Obrigatório)]:", value=forn_atual if forn_atual not in lista_fornecedores else "")
+                    
+                    # Controle de Exibição do Fornecedor Personalizado (MÁGICA AQUI)
+                    final_forn_txt = ""
+                    if sel_forn_edit == "Outros":
+                        final_forn_txt = c_f2.text_input("Digite o Fornecedor :red[(Obrigatório)]:", value=forn_atual if forn_atual not in lista_fornecedores else "")
                     
                     st.write("---")
                     st.write("📦 **Controle de Estoque:**")
@@ -316,7 +327,9 @@ if menu == "📦 Estoque":
                                 sheet_hist_est.append_row([datetime.now().strftime('%d/%m/%Y %H:%M'), sel_e, tipo_ajuste, abs(diff), "Correção Manual"])
                                 
                             limpar_cache()
-                            st.success("Atualizado!"); time.sleep(1); st.rerun()
+                            st.success("Atualizado! A tela foi limpa para a próxima edição.")
+                            time.sleep(1.5)
+                            st.rerun()
                     
                     if btn_excluir:
                         sheet_estoque.delete_rows(int(idx + 2))
@@ -366,7 +379,6 @@ elif menu == "💰 Caixa":
             
             lista_produtos_caixa = sorted(df_est['Nome_Exibicao'].astype(str).tolist())
             
-            # --- CHAVE DE MEMÓRIA PARA O SELECTBOX DE PRODUTO ---
             p_sel = st.selectbox("Selecione o Produto:", ["(Selecione...)"] + lista_produtos_caixa, key="select_prod_caixa")
             
             if p_sel != "(Selecione...)":
@@ -380,7 +392,6 @@ elif menu == "💰 Caixa":
                 st.markdown(f'<div class="estoque-info">📊 EM ESTOQUE: {calc_fisico(atual, ref)} | 💰 Preço Un: {para_real_visual(vlr_un)}</div>', unsafe_allow_html=True)
 
                 q1, q2 = st.columns(2)
-                # Chaves de memória para as quantidades
                 v_f = q1.number_input("Fardos:", min_value=0, key="c_fardos")
                 v_u = q2.number_input("Unidades:", min_value=0, key="c_unid")
                 
@@ -394,7 +405,6 @@ elif menu == "💰 Caixa":
                         sucesso_ao_adicionar = False
                         achou = False
                         
-                        # Verifica se já está no carrinho
                         for item in st.session_state.carrinho:
                             if item["Produto"] == p_sel:
                                 achou = True
@@ -408,7 +418,6 @@ elif menu == "💰 Caixa":
                                     sucesso_ao_adicionar = True
                                 break
                         
-                        # Adiciona como item novo se não estiver
                         if not achou:
                             st.session_state.carrinho.append({
                                 "Produto": p_sel,
@@ -419,7 +428,6 @@ elif menu == "💰 Caixa":
                             })
                             sucesso_ao_adicionar = True
                             
-                        # --- LIMPEZA MÁGICA APÓS ADICIONAR ---
                         if sucesso_ao_adicionar:
                             if 'select_prod_caixa' in st.session_state:
                                 del st.session_state['select_prod_caixa']
@@ -427,7 +435,7 @@ elif menu == "💰 Caixa":
                                 del st.session_state['c_fardos']
                             if 'c_unid' in st.session_state:
                                 del st.session_state['c_unid']
-                            st.rerun() # Recarrega a tela com os campos limpos!
+                            st.rerun() 
                     else: 
                         st.error(f"⚠️ Estoque insuficiente! Você tem apenas {atual} unidades disponíveis.")
 
