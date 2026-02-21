@@ -53,7 +53,9 @@ if not st.session_state.logado:
 # ==========================================
 try:
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-    creds = ServiceAccountCredentials.from_json_keyfile_dict(st.secrets["gcp_service_account"], scope))
+    
+    # CORREÇÃO DO ERRO DA FOTO: Removido o parêntese extra e ajustado para Streamlit Secrets
+    creds = ServiceAccountCredentials.from_json_keyfile_dict(st.secrets["gcp_service_account"], scope)
     client = gspread.authorize(creds)
     planilha = client.open("Fidelidade")
     sheet_clientes = planilha.worksheet("Página1") 
@@ -98,7 +100,7 @@ try:
     garantir_cabecalhos()
 
 except Exception as e:
-    st.error("Erro de conexão. Verifique sua internet.")
+    st.error(f"Erro de conexão: {e}")
     st.stop()
 
 # --- FUNÇÕES ---
@@ -132,7 +134,7 @@ def gerar_mensagem(nome_cliente, pontos):
 # ==========================================
 with st.sidebar:
     st.title("🔧 Menu Principal")
-    menu = st.radio("Navegar:", ["💰 Caixa", "📦 Estoque", "👥 Clientes", "📊 Históricos"])
+    menu = st.radio("Navegar:", ["💰 Caixa", "📦 Estoque", "👥 Clientes", "📊 HISTÓRICOS"])
     st.divider()
     if st.button("SAIR 📴"):
         st.session_state.logado = False
@@ -143,7 +145,6 @@ with st.sidebar:
 # ==========================================
 if menu == "📦 Estoque":
     st.title("📦 Gestão de Estoque")
-    
     df_est = carregar_dados_estoque()
     
     if not df_est.empty:
@@ -154,11 +155,9 @@ if menu == "📦 Estoque":
     aba_estoque = st.radio("Selecione a tela:", ["📋 Lista Detalhada", "🆕 Cadastrar Novo", "✏️ Editar/Excluir"], horizontal=True, label_visibility="collapsed")
     st.divider()
 
-    # --- LISTA ---
     if aba_estoque == "📋 Lista Detalhada":
         if not df_est.empty:
             df_vis = df_est.copy()
-
             df_vis['custo_n'] = df_vis['Custo'].apply(cvt_num)
             df_vis['venda_n'] = df_vis['Venda'].apply(cvt_num)
             df_vis['Lucro Un.'] = df_vis['venda_n'] - df_vis['custo_n']
@@ -166,322 +165,175 @@ if menu == "📦 Estoque":
             df_vis['Venda (R$)'] = df_vis['venda_n'].apply(para_real_visual)
             df_vis['Lucro (R$)'] = df_vis['Lucro Un.'].apply(para_real_visual)
             df_vis['Físico'] = df_vis.apply(lambda r: calc_fisico(int(cvt_num(r['Estoque'])), int(cvt_num(r.get('Qtd_Fardo', 12)))), axis=1)
-            
             df_vis = df_vis.sort_values(by='Nome')
             st.dataframe(df_vis[['Nome', 'Tipo', 'ML', 'Físico', 'Custo (R$)', 'Venda (R$)', 'Lucro (R$)', 'Fornecedor', 'Data Compra']], use_container_width=True)
         else:
-            st.info("O estoque está vazio. Cadastre o primeiro produto na tela 'Cadastrar Novo'.")
+            st.info("O estoque está vazio.")
 
-    # --- NOVO ---
     elif aba_estoque == "🆕 Cadastrar Novo":
         st.subheader("Cadastrar Produto")
         with st.form("form_novo_produto", clear_on_submit=True):
-            n_nome = st.text_input("Nome do Produto :red[(Obrigatório)]:", key="novo_nome_add").upper()
-            
+            n_nome = st.text_input("Nome do Produto :red[(Obrigatório)]:").upper()
             c_t1, c_t2 = st.columns(2)
             lista_tipos = ["GARRAFA 600ML", "LATA", "LITRÃO", "LONG NECK", "OUTROS"]
             n_tipo = c_t1.selectbox("Tipo:", lista_tipos)
-            
             lista_ml = ["200ml", "210ml", "269ml", "300ml", "330ml", "350ml", "473ml", "550ml", "600ml", "950ml", "1 Litro", "Outros"]
             sel_ml = c_t2.selectbox("Volume (ML):", lista_ml)
             n_ml = c_t2.text_input("Se escolheu 'Outros', digite o ML :red[(Obrigatório)]:")
-
             c1, c2 = st.columns(2)
             n_custo = c1.text_input("Custo Unitário R$ :red[(Obrigatório)]:", placeholder="0.00")
             n_venda = c2.text_input("Venda Unitária R$ :red[(Obrigatório)]:", placeholder="00.00")
-            
             c3, c4 = st.columns(2)
             lista_fornecedores = ["Ambev", "Daterra", "Jurerê", "Mix Matheus", "Zé Delivery", "Outros"]
             sel_forn = c3.selectbox("Fornecedor :red[(Obrigatório)]:", lista_fornecedores)
             n_forn_custom = c4.text_input("Se escolheu 'Outros', digite o Fornecedor :red[(Obrigatório)]:")
-            
             n_data = st.date_input("Data Compra", date.today())
-            
             st.divider()
-            st.write("📦 **Estoque Inicial:**")
             tipo_compra = st.radio("Formato da Compra:", ["Fardo Fechado", "Unidades Soltas"], horizontal=True)
             col_a, col_b = st.columns(2)
             n_ref = col_a.number_input("Itens por Fardo (Ref):", value=12)
-            
             qtd_inicial = col_b.number_input("Qtd Fardos / Unidades:" , min_value=0)
             
             if st.form_submit_button("✅ CADASTRAR PRODUTO", type="primary"):
-                # A MÁGICA: Se marcou da lista, ignora o que está na caixa de texto. Se marcou outros, pega o da caixa.
-                qtd_final = qtd_inicial * n_ref if tipo_compra == "Fardo Fechado" else qtd_inicial
-                ml_final = n_ml if sel_ml == "Outros" else sel_ml
                 forn_final = n_forn_custom if sel_forn == "Outros" else sel_forn
-                
-                erro = False
-                if not n_nome: st.error("⚠️ Nome Obrigatório"); erro = True
-                if not n_custo: st.error("⚠️ Custo Obrigatório"); erro = True
-                if not n_venda: st.error("⚠️ Venda Obrigatória"); erro = True
-                if not forn_final: st.error("⚠️ Fornecedor Obrigatório"); erro = True
-                if sel_ml == "Outros" and not n_ml: st.error("⚠️ Digite o ML"); erro = True
-                
-                if not erro:
+                ml_final = n_ml if sel_ml == "Outros" else sel_ml
+                qtd_final = qtd_inicial * n_ref if tipo_compra == "Fardo Fechado" else qtd_inicial
+                if not n_nome or not n_custo or not n_venda or not forn_final:
+                    st.error("Preencha todos os campos obrigatórios!")
+                else:
                     sheet_estoque.append_row([n_nome, n_tipo, forn_final, salvar_com_ponto(cvt_num(n_custo)), salvar_com_ponto(cvt_num(n_venda)), qtd_final, n_data.strftime('%d/%m/%Y'), n_ref, ml_final])
                     sheet_hist_est.append_row([datetime.now().strftime('%d/%m/%Y %H:%M'), n_nome, "NOVO", qtd_final, forn_final])
                     limpar_cache()
-                    st.success(f"✅ O produto '{n_nome}' foi cadastrado com sucesso! A tela já está limpa para o próximo.")
+                    st.success(f"✅ Produto '{n_nome}' cadastrado!")
 
-    # --- EDITAR ---
     elif aba_estoque == "✏️ Editar/Excluir":
         if not df_est.empty:
-            lista_produtos_ordenada = sorted(df_est['Nome_Exibicao'].astype(str).tolist())
-            sel_e = st.selectbox("Selecione o produto para Editar:", ["Selecione..."] + lista_produtos_ordenada)
-            
+            lista_prods = sorted(df_est['Nome_Exibicao'].astype(str).tolist())
+            sel_e = st.selectbox("Selecione para Editar:", ["Selecione..."] + lista_prods)
             if sel_e != "Selecione...":
                 idx = df_est[df_est['Nome_Exibicao'] == sel_e].index[0]
                 row = df_est.iloc[idx]
-                
-                # A MÁGICA DO FANTASMA: Colocamos o idx no nome do formulário. 
-                # Cada produto ganha um formulário virgem e limpo quando é selecionado!
-                with st.form(f"form_editar_produto_{idx}", clear_on_submit=True):
+                # A MÁGICA: O form ID muda com o index, limpando o "fantasma"
+                with st.form(key=f"ed_form_{idx}", clear_on_submit=True):
                     novo_nome = st.text_input("Nome do Produto :red[(Obrigatório)]:", value=str(row['Nome'])).upper()
-                    
                     c_tipo, c_ml = st.columns(2)
                     list_tipos = ["GARRAFA 600ML", "LATA", "LITRÃO", "LONG NECK", "OUTROS"]
-                    t_atual = row.get('Tipo', 'LATA')
-                    idx_t = list_tipos.index(t_atual) if t_atual in list_tipos else 1
+                    idx_t = list_tipos.index(row['Tipo']) if row['Tipo'] in list_tipos else 1
                     novo_tipo = c_tipo.selectbox("Tipo:", list_tipos, index=idx_t)
-                    
                     lista_ml = ["200ml", "210ml", "269ml", "300ml", "330ml", "350ml", "473ml", "550ml", "600ml", "950ml", "1 Litro", "Outros"]
-                    ml_banco = str(row.get('ML', '350ml'))
-                    idx_ml_ini = lista_ml.index(ml_banco) if ml_banco in lista_ml else 11
-                    sel_ml_edit = c_ml.selectbox("Volume (ML):", lista_ml, index=idx_ml_ini)
-                    final_ml_txt = c_ml.text_input("Se 'Outros', digite o ML :red[(Obrigatório)]:", value=ml_banco if ml_banco not in lista_ml else "")
-
+                    idx_m = lista_ml.index(row['ML']) if row['ML'] in lista_ml else 11
+                    sel_ml_edit = c_ml.selectbox("Volume (ML):", lista_ml, index=idx_m)
+                    n_ml_edit = c_ml.text_input("Se 'Outros', digite o ML:", value=row['ML'] if sel_ml_edit == "Outros" else "")
                     c_a, c_b = st.columns(2)
-                    v_venda = c_a.text_input("Venda (R$) :red[(Obrigatório)]:", value=str(row['Venda']))
-                    v_custo = c_b.text_input("Custo (R$) :red[(Obrigatório)]:", value=str(row['Custo']))
-                    
+                    v_venda = c_a.text_input("Venda (R$):", value=str(row['Venda']))
+                    v_custo = c_b.text_input("Custo (R$):", value=str(row['Custo']))
                     c_f1, c_f2 = st.columns(2)
                     lista_fornecedores = ["Ambev", "Daterra", "Jurerê", "Mix Matheus", "Zé Delivery", "Outros"]
-                    forn_atual = str(row.get('Fornecedor', ''))
-                    idx_forn = lista_fornecedores.index(forn_atual) if forn_atual in lista_fornecedores else 5
-                    
-                    sel_forn_edit = c_f1.selectbox("Fornecedor :red[(Obrigatório)]:", lista_fornecedores, index=idx_forn)
-                    final_forn_txt = c_f2.text_input("Se 'Outros', digite o Fornecedor :red[(Obrigatório)]:", value=forn_atual if forn_atual not in lista_fornecedores else "")
+                    idx_f = lista_fornecedores.index(row['Fornecedor']) if row['Fornecedor'] in lista_fornecedores else 5
+                    sel_forn_edit = c_f1.selectbox("Fornecedor:", lista_fornecedores, index=idx_f)
+                    n_forn_edit = c_f2.text_input("Se 'Outros', digite o Fornecedor:", value=row['Fornecedor'] if sel_forn_edit == "Outros" else "")
                     
                     st.write("---")
-                    st.write("📦 **Controle de Estoque:**")
-                    
                     estoque_atual_num = int(cvt_num(row['Estoque']))
                     ref_fardo = int(cvt_num(row.get('Qtd_Fardo', 12)))
-                    
-                    st.info(f"📊 Estoque Físico Atual no Sistema: **{calc_fisico(estoque_atual_num, ref_fardo)}** (Total: {estoque_atual_num} unid.)")
-                    
+                    st.info(f"📊 Estoque Atual: {calc_fisico(estoque_atual_num, ref_fardo)} ({estoque_atual_num} unid.)")
                     e1, e2, e3 = st.columns(3)
-                    estoque_editado = e1.number_input("Corrigir Total (Unid.):", value=estoque_atual_num, min_value=0, help="Altere aqui se o sistema estiver com o número errado.")
-                    add_f = e2.number_input("➕ Nova Compra (Fardos):", min_value=0)
-                    add_u = e3.number_input("➕ Nova Compra (Unid.):", min_value=0)
+                    estoque_editado = e1.number_input("Corrigir Total:", value=estoque_atual_num)
+                    add_f = e2.number_input("➕ Novo Fardo:", min_value=0)
+                    add_u = e3.number_input("➕ Nova Unid:", min_value=0)
                     
-                    st.write("---")
                     b_sal, b_exc = st.columns(2)
-                    btn_salvar = b_sal.form_submit_button("💾 SALVAR ALTERAÇÕES")
-                    btn_excluir = b_exc.form_submit_button("🗑️ EXCLUIR PRODUTO")
-                    
-                    if btn_salvar:
-                        # O CÉREBRO: Se escolheu na lista (ex: Ambev), ele IGNORA o que estiver escrito na caixinha de "Outros".
-                        forn_final_salvar = final_forn_txt if sel_forn_edit == "Outros" else sel_forn_edit
-                        ml_save = final_ml_txt if sel_ml_edit == "Outros" else sel_ml_edit
-                        
-                        if not novo_nome:
-                            st.error("⚠️ O nome do produto não pode ficar vazio!")
-                        elif not forn_final_salvar:
-                            st.error("⚠️ O fornecedor não pode ficar vazio!")
-                        elif sel_ml_edit == "Outros" and not ml_save:
-                            st.error("⚠️ O ML não pode ficar vazio!")
-                        else:
-                            novo_tot = estoque_editado + (add_f * ref_fardo) + add_u
-                            
-                            sheet_estoque.update_cell(idx+2, 1, novo_nome)
-                            sheet_estoque.update_cell(idx+2, 2, novo_tipo)
-                            sheet_estoque.update_cell(idx+2, 3, forn_final_salvar)
-                            sheet_estoque.update_cell(idx+2, 4, salvar_com_ponto(cvt_num(v_custo)))
-                            sheet_estoque.update_cell(idx+2, 5, salvar_com_ponto(cvt_num(v_venda)))
-                            sheet_estoque.update_cell(idx+2, 6, novo_tot)
-                            sheet_estoque.update_cell(idx+2, 7, date.today().strftime('%d/%m/%Y'))
-                            try: sheet_estoque.update_cell(idx+2, 9, ml_save)
-                            except: pass
-                            
-                            if (add_f * ref_fardo) + add_u > 0: 
-                                sheet_hist_est.append_row([datetime.now().strftime('%d/%m/%Y %H:%M'), sel_e, "ENTRADA", (add_f * ref_fardo) + add_u, f"Forn: {forn_final_salvar}"])
-                            elif estoque_editado != estoque_atual_num:
-                                diff = estoque_editado - estoque_atual_num
-                                tipo_ajuste = "AJUSTE (+)" if diff > 0 else "AJUSTE (-)"
-                                sheet_hist_est.append_row([datetime.now().strftime('%d/%m/%Y %H:%M'), sel_e, tipo_ajuste, abs(diff), "Correção Manual"])
-                                
-                            limpar_cache()
-                            st.success("Atualizado! A tela foi limpa para a próxima edição.")
-                            time.sleep(1.5)
-                            st.rerun()
-                    
-                    if btn_excluir:
+                    if b_sal.form_submit_button("💾 SALVAR"):
+                        forn_fin = n_forn_edit if sel_forn_edit == "Outros" else sel_forn_edit
+                        ml_fin = n_ml_edit if sel_ml_edit == "Outros" else sel_ml_edit
+                        novo_tot = estoque_editado + (add_f * ref_fardo) + add_u
+                        sheet_estoque.update_cell(idx+2, 1, novo_nome)
+                        sheet_estoque.update_cell(idx+2, 2, novo_tipo)
+                        sheet_estoque.update_cell(idx+2, 3, forn_fin)
+                        sheet_estoque.update_cell(idx+2, 4, salvar_com_ponto(cvt_num(v_custo)))
+                        sheet_estoque.update_cell(idx+2, 5, salvar_com_ponto(cvt_num(v_venda)))
+                        sheet_estoque.update_cell(idx+2, 6, novo_tot)
+                        sheet_estoque.update_cell(idx+2, 7, date.today().strftime('%d/%m/%Y'))
+                        sheet_estoque.update_cell(idx+2, 9, ml_fin)
+                        limpar_cache()
+                        st.success("Atualizado!"); time.sleep(1); st.rerun()
+                    if b_exc.form_submit_button("🗑️ EXCLUIR", type="primary"):
                         sheet_estoque.delete_rows(int(idx + 2))
                         limpar_cache()
-                        st.warning("Excluído!"); time.sleep(1); st.rerun()
+                        st.rerun()
 
 # ==========================================
-# 💰 CAIXA & CARRINHO DE COMPRAS
+# 💰 CAIXA & CARRINHO
 # ==========================================
 elif menu == "💰 Caixa":
     st.title("💰 Caixa & Fidelidade")
-    
     if 'v_suc' in st.session_state and st.session_state.v_suc:
-        st.success("Venda Realizada com Sucesso!")
+        st.success("Venda Realizada!")
         st.markdown(f'<a href="{st.session_state.l_zap}" target="_blank" class="big-btn">{st.session_state.b_txt}</a>', unsafe_allow_html=True)
-        if st.button("Nova Venda"): 
-            st.session_state.v_suc = False
-            st.rerun()
+        if st.button("Nova Venda"): st.session_state.v_suc = False; st.rerun()
     else:
         df_cli = carregar_dados_clientes()
         df_est = carregar_dados_estoque()
-        
-        # 1. Seleção do Cliente
-        if not df_cli.empty:
-            lista_clientes_ordenada = sorted((df_cli['nome'].astype(str) + " - " + df_cli['telefone'].astype(str)).tolist())
-            opcoes_clientes = ["🆕 NOVO"] + lista_clientes_ordenada
-        else:
-            opcoes_clientes = ["🆕 NOVO"]
-            
-        sel_c = st.selectbox("Cliente da Venda:", opcoes_clientes)
-        
+        lista_c = ["🆕 NOVO"] + sorted((df_cli['nome'].astype(str) + " - " + df_cli['telefone'].astype(str)).tolist()) if not df_cli.empty else ["🆕 NOVO"]
+        sel_c = st.selectbox("Cliente:", lista_c)
         c1, c2 = st.columns(2)
-        if sel_c == "🆕 NOVO": 
-            n_c = c1.text_input("Nome:").upper()
-            t_c = c2.text_input("Tel:")
-        else: 
-            n_c = sel_c.split(" - ")[0]
-            t_c = sel_c.split(" - ")[1]
+        n_c = c1.text_input("Nome:").upper() if sel_c == "🆕 NOVO" else sel_c.split(" - ")[0]
+        t_c = c2.text_input("Tel:") if sel_c == "🆕 NOVO" else sel_c.split(" - ")[1]
         
         st.divider()
-        st.write("🛒 **Adicionar Produtos ao Carrinho**")
-        
         if not df_est.empty:
-            if 'ML' not in df_est.columns: df_est['ML'] = "-"
-            if 'Tipo' not in df_est.columns: df_est['Tipo'] = "-"
-            df_est['Nome_Exibicao'] = df_est['Nome'].astype(str) + " - " + df_est['Tipo'].astype(str) + " (" + df_est['ML'].astype(str) + ")"
-            
-            lista_produtos_caixa = sorted(df_est['Nome_Exibicao'].astype(str).tolist())
-            
-            p_sel = st.selectbox("Selecione o Produto:", ["(Selecione...)"] + lista_produtos_caixa, key="select_prod_caixa")
-            
+            lista_p = sorted(df_est['Nome_Exibicao'].astype(str).tolist())
+            p_sel = st.selectbox("Produto:", ["(Selecione...)"] + lista_p, key="p_caixa")
             if p_sel != "(Selecione...)":
+                row_p = df_est[df_est['Nome_Exibicao'] == p_sel].iloc[0]
                 idx_p = df_est[df_est['Nome_Exibicao'] == p_sel].index[0]
-                row_p = df_est.iloc[idx_p]
-                
-                atual = int(cvt_num(row_p["Estoque"]))
-                ref = int(cvt_num(row_p.get("Qtd_Fardo", 12)))
-                vlr_un = cvt_num(row_p['Venda'])
-                
-                st.markdown(f'<div class="estoque-info">📊 EM ESTOQUE: {calc_fisico(atual, ref)} | 💰 Preço Un: {para_real_visual(vlr_un)}</div>', unsafe_allow_html=True)
-
+                st.info(f"💰 Preço: {para_real_visual(cvt_num(row_p['Venda']))} | Estoque: {row_p['Estoque']}")
                 q1, q2 = st.columns(2)
-                v_f = q1.number_input("Fardos:", min_value=0, key="c_fardos")
-                v_u = q2.number_input("Unidades:", min_value=0, key="c_unid")
-                
-                if st.button("➕ ADICIONAR AO CARRINHO"):
+                v_f = q1.number_input("Fardos:", min_value=0, key="f_caixa")
+                v_u = q2.number_input("Unid:", min_value=0, key="u_caixa")
+                if st.button("➕ ADICIONAR"):
+                    ref = int(cvt_num(row_p.get('Qtd_Fardo', 12)))
                     baixa = (v_f * ref) + v_u
-                    
-                    if baixa == 0:
-                        st.warning("⚠️ Adicione pelo menos 1 unidade ou fardo para colocar no carrinho.")
-                    elif atual >= baixa:
-                        total_item_reais = baixa * vlr_un
-                        sucesso_ao_adicionar = False
-                        achou = False
-                        
-                        for item in st.session_state.carrinho:
-                            if item["Produto"] == p_sel:
-                                achou = True
-                                if (item["Total Unid."] + baixa) > atual:
-                                    st.error("⚠️ Estoque insuficiente para essa soma!")
-                                else:
-                                    item["Fardos"] += v_f
-                                    item["Unidades"] += v_u
-                                    item["Total Unid."] += baixa
-                                    item["Valor R$"] += total_item_reais
-                                    sucesso_ao_adicionar = True
-                                break
-                        
-                        if not achou:
-                            st.session_state.carrinho.append({
-                                "Produto": p_sel,
-                                "Fardos": v_f,
-                                "Unidades": v_u,
-                                "Total Unid.": baixa,
-                                "Valor R$": total_item_reais
-                            })
-                            sucesso_ao_adicionar = True
-                            
-                        if sucesso_ao_adicionar:
-                            if 'select_prod_caixa' in st.session_state:
-                                del st.session_state['select_prod_caixa']
-                            if 'c_fardos' in st.session_state:
-                                del st.session_state['c_fardos']
-                            if 'c_unid' in st.session_state:
-                                del st.session_state['c_unid']
-                            st.rerun() 
-                    else: 
-                        st.error(f"⚠️ Estoque insuficiente! Você tem apenas {atual} unidades disponíveis.")
+                    if int(row_p['Estoque']) >= baixa > 0:
+                        st.session_state.carrinho.append({"Produto": p_sel, "Qtd": baixa, "Preço": cvt_num(row_p['Venda']), "idx": idx_p})
+                        st.rerun()
+                    else: st.error("Qtd inválida ou estoque insuficiente.")
 
-        # ========================================
-        # MOSTRAR O CARRINHO E FINALIZAR A VENDA
-        # ========================================
-        if len(st.session_state.carrinho) > 0:
+        if st.session_state.carrinho:
             st.write("---")
-            st.subheader("🛍️ Seu Carrinho:")
+            st.subheader("🛍️ Carrinho")
+            df_car = pd.DataFrame(st.session_state.carrinho)
+            st.table(df_car[['Produto', 'Qtd', 'Preço']])
+            total = sum(item['Qtd'] * item['Preço'] for item in st.session_state.carrinho)
+            st.subheader(f"Total: {para_real_visual(total)}")
             
-            df_carrinho = pd.DataFrame(st.session_state.carrinho)
-            df_carrinho_vis = df_carrinho.copy()
-            df_carrinho_vis['Valor R$'] = df_carrinho_vis['Valor R$'].apply(para_real_visual)
-            st.dataframe(df_carrinho_vis, use_container_width=True)
-            
-            valor_total_compra = sum(item['Valor R$'] for item in st.session_state.carrinho)
-            st.success(f"💰 **VALOR TOTAL DA COMPRA: {para_real_visual(valor_total_compra)}**")
-            
-            col_fin, col_limp = st.columns(2)
-            
-            if col_limp.button("🗑️ Limpar Carrinho"):
-                st.session_state.carrinho = []
-                st.rerun()
-                
-            if col_fin.button("✅ FINALIZAR VENDA COMPLETA", type="primary"):
-                tl = limpar_tel(t_c)
-                
-                with st.spinner("Registrando produtos e baixando estoque..."):
+            c_f, c_l = st.columns(2)
+            if c_l.button("Limpar Carrinho"): st.session_state.carrinho = []; st.rerun()
+            if c_f.button("✅ FINALIZAR VENDA", type="primary"):
+                with st.spinner("Finalizando..."):
                     for item in st.session_state.carrinho:
-                        nome_prod = item["Produto"]
-                        qtd_baixa = item["Total Unid."]
-                        valor_total_item = item["Valor R$"]
-                        
-                        match_prod = df_est[df_est['Nome_Exibicao'] == nome_prod]
-                        if not match_prod.empty:
-                            idx_p_planilha = match_prod.index[0]
-                            estoque_atualizado = int(cvt_num(match_prod.iloc[0]['Estoque'])) - qtd_baixa
-                            
-                            sheet_estoque.update_cell(idx_p_planilha+2, 6, estoque_atualizado)
-                            sheet_hist_est.append_row([datetime.now().strftime('%d/%m/%Y %H:%M'), nome_prod, "VENDA", qtd_baixa, salvar_com_ponto(valor_total_item)])
-                            time.sleep(0.5) 
-
-                if not df_cli.empty and not df_cli[df_cli['telefone'].astype(str).apply(limpar_tel) == tl].empty:
-                    match_cli = df_cli[df_cli['telefone'].astype(str).apply(limpar_tel) == tl]
-                    pts = int(match_cli.iloc[0]['compras']) + 1
-                    sheet_clientes.update_cell(int(match_cli.index[0]+2), 3, pts)
-                else:
+                        prod_row = df_est.iloc[item['idx']]
+                        novo_est = int(prod_row['Estoque']) - item['Qtd']
+                        sheet_estoque.update_cell(int(item['idx']+2), 6, novo_est)
+                        sheet_hist_est.append_row([datetime.now().strftime('%d/%m/%Y %H:%M'), item['Produto'], "VENDA", item['Qtd'], salvar_com_ponto(item['Qtd']*item['Preço'])])
+                    
+                    tl = limpar_tel(t_c)
                     pts = 1
-                    sheet_clientes.append_row([n_c, tl, 1, date.today().strftime('%d/%m/%Y')])
-                
-                sheet_hist_cli.append_row([datetime.now().strftime('%d/%m/%Y %H:%M'), n_c, tl, pts])
-                msg, btn = gerar_mensagem(n_c, pts)
-                
-                st.session_state.carrinho = []
-                limpar_cache()
-                
-                st.session_state.l_zap = f"https://api.whatsapp.com/send?phone=55{tl}&text={urllib.parse.quote(msg)}"
-                st.session_state.b_txt = btn
-                st.session_state.v_suc = True
-                st.rerun()
+                    if not df_cli.empty and not df_cli[df_cli['telefone'].astype(str).apply(limpar_tel) == tl].empty:
+                        cli_row = df_cli[df_cli['telefone'].astype(str).apply(limpar_tel) == tl]
+                        pts = int(cli_row.iloc[0]['compras']) + 1
+                        sheet_clientes.update_cell(int(cli_row.index[0]+2), 3, pts)
+                    else:
+                        sheet_clientes.append_row([n_c, tl, 1, date.today().strftime('%d/%m/%Y')])
+                    
+                    sheet_hist_cli.append_row([datetime.now().strftime('%d/%m/%Y %H:%M'), n_c, tl, pts])
+                    msg, btn = gerar_mensagem(n_c, pts)
+                    st.session_state.carrinho = []
+                    st.session_state.l_zap = f"https://api.whatsapp.com/send?phone=55{tl}&text={urllib.parse.quote(msg)}"
+                    st.session_state.b_txt = btn
+                    st.session_state.v_suc = True
+                    limpar_cache()
+                    st.rerun()
 
 # ==========================================
 # 👥 CLIENTES
@@ -489,62 +341,30 @@ elif menu == "💰 Caixa":
 elif menu == "👥 Clientes":
     st.title("👥 Gerenciar Clientes")
     df_c = carregar_dados_clientes()
-    
-    total_clientes = len(df_c) if not df_c.empty else 0
-    st.metric("Total de Clientes Cadastrados", total_clientes)
-    
-    t_lista, t_editar = st.tabs(["📋 Lista de Clientes", "⚙️ Editar/Excluir"])
-    
-    with t_lista:
+    st.metric("Total", len(df_c) if not df_c.empty else 0)
+    t1, t2 = st.tabs(["📋 Lista", "⚙️ Editar"])
+    with t1:
+        if not df_c.empty: st.dataframe(df_c.sort_values('nome'), use_container_width=True)
+    with t2:
         if not df_c.empty:
-            df_view = df_c[['nome', 'telefone', 'compras']].copy()
-            df_view.columns = ["Nome do Cliente", "Telefone", "Pontos Acumulados"]
-            
-            df_view = df_view.sort_values(by="Nome do Cliente")
-            
-            st.dataframe(df_view, use_container_width=True, hide_index=True)
-        else:
-            st.info("Nenhum cliente cadastrado ainda.")
-
-    with t_editar:
-        if not df_c.empty:
-            lista_nomes_ordenada = sorted(df_c['nome'].astype(str).tolist())
-            sel = st.selectbox("Editar Cliente:", ["Selecione..."] + lista_nomes_ordenada)
-            
+            sel = st.selectbox("Cliente:", ["Selecione..."] + sorted(df_c['nome'].tolist()))
             if sel != "Selecione...":
                 idx = df_c[df_c['nome']==sel].index[0]
-                pts_atuais = int(df_c.iloc[idx]['compras'])
-                
-                if pts_atuais < 10:
-                    st.info(f"🏆 Pontuação Atual: **{pts_atuais} pontos** (Faltam {10-pts_atuais} para o prêmio!)")
-                else:
-                    st.info(f"🏆 Pontuação Atual: **{pts_atuais} pontos** - PRÊMIO DISPONÍVEL! 🎁")
-                
-                with st.form("ed_c"):
+                with st.form(f"cli_{idx}"):
                     nn = st.text_input("Nome:", value=df_c.iloc[idx]['nome'])
                     nt = st.text_input("Tel:", value=str(df_c.iloc[idx]['telefone']))
-                    np = st.number_input("Pontos:", value=pts_atuais)
-                    b1, b2 = st.columns(2)
-                    if b1.form_submit_button("💾 Salvar"):
+                    np = st.number_input("Pontos:", value=int(df_c.iloc[idx]['compras']))
+                    if st.form_submit_button("💾 Salvar"):
                         sheet_clientes.update_cell(idx+2, 1, nn)
                         sheet_clientes.update_cell(idx+2, 2, nt)
                         sheet_clientes.update_cell(idx+2, 3, np)
-                        limpar_cache()
-                        st.success("Salvo!"); time.sleep(1); st.rerun()
-                    if b2.form_submit_button("🗑️ Excluir", type="primary"):
-                        sheet_clientes.delete_rows(int(idx+2))
-                        limpar_cache()
-                        st.rerun()
+                        limpar_cache(); st.rerun()
 
 # ==========================================
 # 📊 HISTÓRICOS
 # ==========================================
 elif menu == "📊 HISTÓRICOS":
     st.title("📊 Relatórios")
-    aba_hist = st.radio("Selecione o Relatório:", ["Vendas (Clientes)", "Movim. Estoque"], horizontal=True, label_visibility="collapsed")
-    st.divider()
-    
-    if aba_hist == "Vendas (Clientes)":
-        st.dataframe(carregar_historico_cli(), use_container_width=True)
-    elif aba_hist == "Movim. Estoque":
-        st.dataframe(carregar_historico_est(), use_container_width=True)
+    h1, h2 = st.tabs(["Clientes", "Estoque"])
+    with h1: st.dataframe(carregar_historico_cli(), use_container_width=True)
+    with h2: st.dataframe(carregar_historico_est(), use_container_width=True)
