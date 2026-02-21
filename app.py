@@ -54,7 +54,7 @@ if not st.session_state.logado:
 try:
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
     
-    # CORREÇÃO DO ERRO DA FOTO: Removido o parêntese extra e ajustado para Streamlit Secrets
+    # CORREÇÃO DA LINHA 56 (Removido o parêntese extra da sua foto)
     creds = ServiceAccountCredentials.from_json_keyfile_dict(st.secrets["gcp_service_account"], scope)
     client = gspread.authorize(creds)
     planilha = client.open("Fidelidade")
@@ -213,7 +213,6 @@ if menu == "📦 Estoque":
             if sel_e != "Selecione...":
                 idx = df_est[df_est['Nome_Exibicao'] == sel_e].index[0]
                 row = df_est.iloc[idx]
-                # A MÁGICA: O form ID muda com o index, limpando o "fantasma"
                 with st.form(key=f"ed_form_{idx}", clear_on_submit=True):
                     novo_nome = st.text_input("Nome do Produto :red[(Obrigatório)]:", value=str(row['Nome'])).upper()
                     c_tipo, c_ml = st.columns(2)
@@ -274,6 +273,12 @@ elif menu == "💰 Caixa":
     else:
         df_cli = carregar_dados_clientes()
         df_est = carregar_dados_estoque()
+        
+        # Garante a coluna inteligente no Caixa também para evitar KeyError
+        if not df_est.empty:
+            if 'Nome_Exibicao' not in df_est.columns:
+                df_est['Nome_Exibicao'] = df_est['Nome'].astype(str) + " - " + df_est['Tipo'].astype(str) + " (" + df_est['ML'].astype(str) + ")"
+
         lista_c = ["🆕 NOVO"] + sorted((df_cli['nome'].astype(str) + " - " + df_cli['telefone'].astype(str)).tolist()) if not df_cli.empty else ["🆕 NOVO"]
         sel_c = st.selectbox("Cliente:", lista_c)
         c1, c2 = st.columns(2)
@@ -282,9 +287,11 @@ elif menu == "💰 Caixa":
         
         st.divider()
         if not df_est.empty:
+            # CORREÇÃO DO KEYERROR: Verifica se a coluna existe antes de ordenar
             lista_p = sorted(df_est['Nome_Exibicao'].astype(str).tolist())
             p_sel = st.selectbox("Produto:", ["(Selecione...)"] + lista_p, key="p_caixa")
             if p_sel != "(Selecione...)":
+                # Busca segura da linha do produto
                 row_p = df_est[df_est['Nome_Exibicao'] == p_sel].iloc[0]
                 idx_p = df_est[df_est['Nome_Exibicao'] == p_sel].index[0]
                 st.info(f"💰 Preço: {para_real_visual(cvt_num(row_p['Venda']))} | Estoque: {row_p['Estoque']}")
@@ -298,6 +305,8 @@ elif menu == "💰 Caixa":
                         st.session_state.carrinho.append({"Produto": p_sel, "Qtd": baixa, "Preço": cvt_num(row_p['Venda']), "idx": idx_p})
                         st.rerun()
                     else: st.error("Qtd inválida ou estoque insuficiente.")
+        else:
+            st.warning("⚠️ Cadastre produtos no Estoque primeiro!")
 
         if st.session_state.carrinho:
             st.write("---")
