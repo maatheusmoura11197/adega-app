@@ -43,19 +43,28 @@ if not st.session_state.logado:
     st.stop()
 
 # ==========================================
-# 📡 CONEXÃO (O SEGREDO DO RAILWAY)
+# 📡 CONEXÃO BLINDADA (RAILWAY + STREAMLIT)
 # ==========================================
 try:
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
     
-    # Lógica Inteligente: Tenta ler do Railway, se não der, tenta do Streamlit
+    # 1. Tenta pegar a chave do Railway (Variáveis de Ambiente)
     if "GCP_SERVICE_ACCOUNT" in os.environ:
         creds_dict = json.loads(os.environ["GCP_SERVICE_ACCOUNT"])
-    else:
+    
+    # 2. Se não achar, tenta pegar do Streamlit (Secrets)
+    elif "gcp_service_account" in st.secrets:
         creds_dict = st.secrets["gcp_service_account"]
-        
+    
+    else:
+        st.error("⚠️ ERRO: Chave não encontrada! Configure no Railway ou Secrets.")
+        st.stop()
+
+    # Cria a conexão (SEM O PARÊNTESE EXTRA)
     creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
     client = gspread.authorize(creds)
+    
+    # Abre as abas
     planilha = client.open("Fidelidade")
     sheet_clientes = planilha.worksheet("Página1") 
     sheet_estoque = planilha.worksheet("Estoque") 
@@ -93,8 +102,17 @@ with st.sidebar:
 # ==========================================
 if menu == "📦 Estoque":
     st.title("📦 Estoque")
-    df = pd.DataFrame(sheet_estoque.get_all_records())
-    if not df.empty: df['Nome_Exibicao'] = df['Nome'].astype(str) + " - " + df['Tipo'].astype(str) + " (" + df['ML'].astype(str) + ")"
+    # Carrega dados com segurança
+    try:
+        dados_brutos = sheet_estoque.get_all_records()
+        df = pd.DataFrame(dados_brutos)
+    except: df = pd.DataFrame()
+    
+    if not df.empty: 
+        if 'Nome' not in df.columns: df['Nome'] = ""
+        if 'Tipo' not in df.columns: df['Tipo'] = ""
+        if 'ML' not in df.columns: df['ML'] = ""
+        df['Nome_Exibicao'] = df['Nome'].astype(str) + " - " + df['Tipo'].astype(str) + " (" + df['ML'].astype(str) + ")"
     
     aba = st.radio("Ação:", ["Lista", "Novo", "Editar"], horizontal=True, label_visibility="collapsed")
     st.divider()
@@ -130,6 +148,7 @@ if menu == "📦 Estoque":
                 final_ml = ml_txt if ml_sel == "Outros" else ml_sel
                 if n and custo and venda and final_forn:
                     sheet_estoque.append_row([n, tipo, final_forn, custo, venda, qtd, date.today().strftime('%d/%m/%Y'), ref, final_ml])
+                    sheet_hist_est.append_row([datetime.now().strftime('%d/%m %H:%M'), n, "NOVO", qtd, final_forn])
                     st.success("Cadastrado!"); time.sleep(1); st.rerun()
                 else: st.error("Preencha tudo!")
 
@@ -139,13 +158,18 @@ if menu == "📦 Estoque":
             if sel != "Selecione...":
                 idx = df[df['Nome_Exibicao'] == sel].index[0]
                 row = df.iloc[idx]
+                
                 with st.form(f"edit_{idx}", clear_on_submit=True):
                     nn = st.text_input("Nome:", value=row['Nome']).upper()
                     c1, c2 = st.columns(2)
-                    nt = c1.selectbox("Tipo:", ["GARRAFA 600ML", "LATA", "LITRÃO", "LONG NECK", "OUTROS"], index=["GARRAFA 600ML", "LATA", "LITRÃO", "LONG NECK", "OUTROS"].index(row['Tipo']) if row['Tipo'] in ["GARRAFA 600ML", "LATA", "LITRÃO", "LONG NECK", "OUTROS"] else 0)
                     
-                    lista_ml = ["269ml", "350ml", "473ml", "600ml", "1 Litro", "Outros"]
-                    nm_sel = c2.selectbox("ML:", lista_ml, index=lista_ml.index(row['ML']) if row['ML'] in lista_ml else 5)
+                    list_t = ["GARRAFA 600ML", "LATA", "LITRÃO", "LONG NECK", "OUTROS"]
+                    idx_t = list_t.index(row['Tipo']) if row['Tipo'] in list_t else 0
+                    nt = c1.selectbox("Tipo:", list_t, index=idx_t)
+                    
+                    list_m = ["269ml", "350ml", "473ml", "600ml", "1 Litro", "Outros"]
+                    idx_m = list_m.index(row['ML']) if row['ML'] in list_m else 5
+                    nm_sel = c2.selectbox("ML:", list_m, index=idx_m)
                     nm_txt = c2.text_input("Digite ML:", value=row['ML'] if nm_sel == "Outros" else "")
 
                     c3, c4 = st.columns(2)
@@ -154,7 +178,8 @@ if menu == "📦 Estoque":
                     
                     c5, c6 = st.columns(2)
                     lista_f = ["Ambev", "Daterra", "Jurerê", "Mix Matheus", "Zé Delivery", "Outros"]
-                    nf_sel = c5.selectbox("Forn:", lista_f, index=lista_f.index(row['Fornecedor']) if row['Fornecedor'] in lista_f else 5)
+                    idx_f = lista_f.index(row['Fornecedor']) if row['Fornecedor'] in lista_f else 5
+                    nf_sel = c5.selectbox("Forn:", lista_f, index=idx_f)
                     nf_txt = c6.text_input("Digite Forn:", value=row['Fornecedor'] if nf_sel == "Outros" else "")
 
                     st.write("---")
@@ -175,9 +200,15 @@ if menu == "📦 Estoque":
                         sheet_estoque.update_cell(idx+2, 4, nc)
                         sheet_estoque.update_cell(idx+2, 5, nv)
                         sheet_estoque.update_cell(idx+2, 6, novo_tot)
-                        sheet_estoque.update_cell(idx+2, 9, final_m)
+                        try: sheet_estoque.update_cell(idx+2, 9, final_m)
+                        except: pass
+                        
                         if add > 0: sheet_hist_est.append_row([datetime.now().strftime('%d/%m %H:%M'), sel, "ENTRADA", add, f"Forn: {final_f}"])
                         st.success("Salvo!"); time.sleep(1); st.rerun()
+                    
+                    if st.form_submit_button("EXCLUIR PRODUTO"):
+                        sheet_estoque.delete_rows(int(idx + 2))
+                        st.warning("Excluído!"); time.sleep(1); st.rerun()
 
 # ==========================================
 # 💰 CAIXA
@@ -189,11 +220,16 @@ elif menu == "💰 Caixa":
         st.markdown(f'<a href="{st.session_state.l_zap}" target="_blank" class="big-btn">{st.session_state.b_txt}</a>', unsafe_allow_html=True)
         if st.button("Nova Venda"): st.session_state.v_suc = False; st.rerun()
     else:
-        df_cli = pd.DataFrame(sheet_clientes.get_all_records())
-        df_est = pd.DataFrame(sheet_estoque.get_all_records())
+        try:
+            df_cli = pd.DataFrame(sheet_clientes.get_all_records())
+            df_est = pd.DataFrame(sheet_estoque.get_all_records())
+        except: df_cli = pd.DataFrame(); df_est = pd.DataFrame()
         
-        if not df_est.empty: 
-            df_est['Nome_Exibicao'] = df_est['Nome'].astype(str) + " - " + df_est['Tipo'].astype(str)
+        if not df_est.empty:
+            if 'Nome' not in df_est.columns: df_est['Nome'] = ""
+            if 'Tipo' not in df_est.columns: df_est['Tipo'] = ""
+            if 'ML' not in df_est.columns: df_est['ML'] = ""
+            df_est['Nome_Exibicao'] = df_est['Nome'].astype(str) + " - " + df_est['Tipo'].astype(str) + " (" + df_est['ML'].astype(str) + ")"
         
         lista_c = ["NOVO"] + sorted(df_cli['nome'].tolist()) if not df_cli.empty else ["NOVO"]
         cli = st.selectbox("Cliente:", lista_c)
@@ -205,19 +241,23 @@ elif menu == "💰 Caixa":
         if not df_est.empty:
             p = st.selectbox("Produto:", ["..."] + sorted(df_est['Nome_Exibicao'].tolist()), key="psel")
             if p != "...":
-                row = df_est[df_est['Nome_Exibicao'] == p].iloc[0]
-                idx = df_est[df_est['Nome_Exibicao'] == p].index[0]
-                st.info(f"💰 {row['Venda']} | Estoque: {row['Estoque']}")
-                
-                c_qtd, c_btn = st.columns([1, 2])
-                q = c_qtd.number_input("Qtd:", 1, key="qsel")
-                
-                if c_btn.button("➕ Adicionar"):
-                    if int(cvt_num(row['Estoque'])) >= q:
-                        st.session_state.carrinho.append({"Produto": p, "Qtd": q, "Valor": cvt_num(row['Venda']), "idx": idx})
-                        del st.session_state['psel']; del st.session_state['qsel']
-                        st.rerun()
-                    else: st.error("Estoque insuficiente!")
+                filtro = df_est[df_est['Nome_Exibicao'] == p]
+                if not filtro.empty:
+                    row = filtro.iloc[0]
+                    idx = filtro.index[0]
+                    st.info(f"💰 {row['Venda']} | Estoque: {row['Estoque']}")
+                    
+                    c_qtd, c_btn = st.columns([1, 2])
+                    q = c_qtd.number_input("Qtd:", 1, key="qsel")
+                    
+                    if c_btn.button("➕ Adicionar"):
+                        if int(cvt_num(row['Estoque'])) >= q:
+                            st.session_state.carrinho.append({"Produto": p, "Qtd": q, "Valor": cvt_num(row['Venda']), "idx": idx})
+                            del st.session_state['psel']; del st.session_state['qsel']
+                            st.rerun()
+                        else: st.error("Estoque insuficiente!")
+        else:
+            st.warning("Cadastre produtos no Estoque primeiro.")
 
         if st.session_state.carrinho:
             df_car = pd.DataFrame(st.session_state.carrinho)
@@ -239,6 +279,8 @@ elif menu == "💰 Caixa":
                     pts = 1
                     sheet_clientes.append_row([n_c, t_c, 1])
                 
+                sheet_hist_cli.append_row([datetime.now().strftime('%d/%m %H:%M'), n_c, t_c, pts])
+                
                 msg, btn = gerar_mensagem(n_c, pts)
                 st.session_state.carrinho = []
                 st.session_state.v_suc = True
@@ -253,7 +295,8 @@ elif menu == "💰 Caixa":
 # ==========================================
 elif menu == "👥 Clientes":
     st.title("Clientes")
-    df = pd.DataFrame(sheet_clientes.get_all_records())
+    try: df = pd.DataFrame(sheet_clientes.get_all_records())
+    except: df = pd.DataFrame()
     st.dataframe(df, use_container_width=True)
 
 # ==========================================
@@ -261,4 +304,5 @@ elif menu == "👥 Clientes":
 # ==========================================
 elif menu == "📊 HISTÓRICOS":
     st.title("Relatórios")
-    st.dataframe(pd.DataFrame(sheet_hist_est.get_all_records()), use_container_width=True)
+    try: st.dataframe(pd.DataFrame(sheet_hist_est.get_all_records()), use_container_width=True)
+    except: st.info("Sem histórico.")
