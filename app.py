@@ -15,7 +15,6 @@ import json
 ICON_URL = "https://splendid-plum-mslpekoeqx.edgeone.app/cerveja.png"
 st.set_page_config(page_title="Adega do Barão", page_icon=ICON_URL, layout="wide")
 
-# Estilos CSS
 st.markdown(f"""
     <style>
     div.stButton > button {{ background-color: #008CBA; color: white; font-weight: bold; border-radius: 10px; height: 3em; width: 100%; border: none; }}
@@ -51,20 +50,16 @@ try:
     # 1. Tenta pegar a chave do Railway (Variáveis de Ambiente)
     if "GCP_SERVICE_ACCOUNT" in os.environ:
         creds_dict = json.loads(os.environ["GCP_SERVICE_ACCOUNT"])
-    
     # 2. Se não achar, tenta pegar do Streamlit (Secrets)
     elif "gcp_service_account" in st.secrets:
         creds_dict = st.secrets["gcp_service_account"]
-    
     else:
         st.error("⚠️ ERRO: Chave não encontrada! Configure no Railway ou Secrets.")
         st.stop()
 
-    # Cria a conexão (SEM O PARÊNTESE EXTRA)
     creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
     client = gspread.authorize(creds)
     
-    # Abre as abas
     planilha = client.open("Fidelidade")
     sheet_clientes = planilha.worksheet("Página1") 
     sheet_estoque = planilha.worksheet("Estoque") 
@@ -102,7 +97,6 @@ with st.sidebar:
 # ==========================================
 if menu == "📦 Estoque":
     st.title("📦 Estoque")
-    # Carrega dados com segurança
     try:
         dados_brutos = sheet_estoque.get_all_records()
         df = pd.DataFrame(dados_brutos)
@@ -120,6 +114,7 @@ if menu == "📦 Estoque":
     if aba == "Lista":
         if not df.empty:
             df['Físico'] = df.apply(lambda r: calc_fisico(int(cvt_num(r['Estoque'])), int(cvt_num(r.get('Qtd_Fardo', 12)))), axis=1)
+            # ORDENAÇÃO ALFABÉTICA APLICADA AQUI
             st.dataframe(df[['Nome', 'Tipo', 'ML', 'Físico', 'Venda', 'Fornecedor']].sort_values('Nome'), use_container_width=True)
         else: st.info("Estoque vazio.")
 
@@ -136,7 +131,9 @@ if menu == "📦 Estoque":
             venda = c4.text_input("Venda R$:")
             
             c5, c6 = st.columns(2)
-            forn_sel = c5.selectbox("Fornecedor:", ["Ambev", "Daterra", "Jurerê", "Mix Matheus", "Zé Delivery", "Outros"])
+            # Lista de fornecedores ordenada
+            lista_forn = sorted(["Ambev", "Daterra", "Jurerê", "Mix Matheus", "Zé Delivery"]) + ["Outros"]
+            forn_sel = c5.selectbox("Fornecedor:", lista_forn)
             forn_txt = c6.text_input("Digite Fornecedor:") if forn_sel == "Outros" else ""
             
             st.divider()
@@ -154,7 +151,10 @@ if menu == "📦 Estoque":
 
     elif aba == "Editar":
         if not df.empty:
-            sel = st.selectbox("Produto:", ["Selecione..."] + sorted(df['Nome_Exibicao'].tolist()))
+            # ORDENAÇÃO ALFABÉTICA NO MENU DE SELEÇÃO
+            lista_prods = sorted(df['Nome_Exibicao'].astype(str).tolist())
+            sel = st.selectbox("Produto:", ["Selecione..."] + lista_prods)
+            
             if sel != "Selecione...":
                 idx = df[df['Nome_Exibicao'] == sel].index[0]
                 row = df.iloc[idx]
@@ -177,8 +177,8 @@ if menu == "📦 Estoque":
                     nv = c4.text_input("Venda:", value=row['Venda'])
                     
                     c5, c6 = st.columns(2)
-                    lista_f = ["Ambev", "Daterra", "Jurerê", "Mix Matheus", "Zé Delivery", "Outros"]
-                    idx_f = lista_f.index(row['Fornecedor']) if row['Fornecedor'] in lista_f else 5
+                    lista_f = sorted(["Ambev", "Daterra", "Jurerê", "Mix Matheus", "Zé Delivery"]) + ["Outros"]
+                    idx_f = lista_f.index(row['Fornecedor']) if row['Fornecedor'] in lista_f else len(lista_f)-1
                     nf_sel = c5.selectbox("Forn:", lista_f, index=idx_f)
                     nf_txt = c6.text_input("Digite Forn:", value=row['Fornecedor'] if nf_sel == "Outros" else "")
 
@@ -231,15 +231,21 @@ elif menu == "💰 Caixa":
             if 'ML' not in df_est.columns: df_est['ML'] = ""
             df_est['Nome_Exibicao'] = df_est['Nome'].astype(str) + " - " + df_est['Tipo'].astype(str) + " (" + df_est['ML'].astype(str) + ")"
         
-        lista_c = ["NOVO"] + sorted(df_cli['nome'].tolist()) if not df_cli.empty else ["NOVO"]
+        # ORDENAÇÃO ALFABÉTICA DA LISTA DE CLIENTES
+        lista_c_nomes = sorted((df_cli['nome'].astype(str) + " - " + df_cli['telefone'].astype(str)).tolist()) if not df_cli.empty else []
+        lista_c = ["NOVO"] + lista_c_nomes
+        
         cli = st.selectbox("Cliente:", lista_c)
         c1, c2 = st.columns(2)
-        n_c = c1.text_input("Nome:") if cli == "NOVO" else cli
-        t_c = c2.text_input("Tel:") if cli == "NOVO" else ""
+        n_c = c1.text_input("Nome:") if cli == "NOVO" else cli.split(" - ")[0]
+        t_c = c2.text_input("Tel:") if cli == "NOVO" else cli.split(" - ")[1]
 
         st.divider()
         if not df_est.empty:
-            p = st.selectbox("Produto:", ["..."] + sorted(df_est['Nome_Exibicao'].tolist()), key="psel")
+            # ORDENAÇÃO ALFABÉTICA DA LISTA DE PRODUTOS
+            lista_p = sorted(df_est['Nome_Exibicao'].astype(str).tolist())
+            p = st.selectbox("Produto:", ["..."] + lista_p, key="psel")
+            
             if p != "...":
                 filtro = df_est[df_est['Nome_Exibicao'] == p]
                 if not filtro.empty:
@@ -261,7 +267,8 @@ elif menu == "💰 Caixa":
 
         if st.session_state.carrinho:
             df_car = pd.DataFrame(st.session_state.carrinho)
-            st.dataframe(df_car, use_container_width=True)
+            # ORDENAÇÃO DO CARRINHO
+            st.dataframe(df_car.sort_values('Produto'), use_container_width=True)
             total = sum(i['Qtd'] * i['Valor'] for i in st.session_state.carrinho)
             st.subheader(f"Total: R$ {total:.2f}")
             
@@ -271,20 +278,30 @@ elif menu == "💰 Caixa":
                     sheet_estoque.update_cell(i['idx']+2, 6, novo)
                     sheet_hist_est.append_row([datetime.now().strftime('%d/%m %H:%M'), i['Produto'], "VENDA", i['Qtd'], i['Valor']])
                 
-                if not df_cli.empty and n_c in df_cli['nome'].values:
-                    idx_c = df_cli[df_cli['nome'] == n_c].index[0]
-                    pts = int(df_cli.iloc[idx_c]['compras']) + 1
-                    sheet_clientes.update_cell(idx_c+2, 3, pts)
-                else:
+                # Normaliza o telefone para busca
+                tl_busca = limpar_tel(t_c)
+                
+                # Tenta achar cliente pelo telefone limpo
+                achou = False
+                if not df_cli.empty:
+                    df_cli['tel_limpo'] = df_cli['telefone'].astype(str).apply(limpar_tel)
+                    match = df_cli[df_cli['tel_limpo'] == tl_busca]
+                    if not match.empty:
+                        achou = True
+                        idx_c = match.index[0]
+                        pts = int(match.iloc[0]['compras']) + 1
+                        sheet_clientes.update_cell(int(idx_c+2), 3, pts)
+                
+                if not achou:
                     pts = 1
-                    sheet_clientes.append_row([n_c, t_c, 1])
+                    sheet_clientes.append_row([n_c, t_c, 1, date.today().strftime('%d/%m/%Y')])
                 
                 sheet_hist_cli.append_row([datetime.now().strftime('%d/%m %H:%M'), n_c, t_c, pts])
                 
                 msg, btn = gerar_mensagem(n_c, pts)
                 st.session_state.carrinho = []
                 st.session_state.v_suc = True
-                st.session_state.l_zap = f"https://api.whatsapp.com/send?phone=55{limpar_tel(t_c)}&text={urllib.parse.quote(msg)}"
+                st.session_state.l_zap = f"https://api.whatsapp.com/send?phone=55{tl_busca}&text={urllib.parse.quote(msg)}"
                 st.session_state.b_txt = btn
                 st.rerun()
             
@@ -297,7 +314,37 @@ elif menu == "👥 Clientes":
     st.title("Clientes")
     try: df = pd.DataFrame(sheet_clientes.get_all_records())
     except: df = pd.DataFrame()
-    st.dataframe(df, use_container_width=True)
+    
+    st.metric("Total", len(df) if not df.empty else 0)
+    
+    t1, t2 = st.tabs(["📋 Lista", "⚙️ Editar"])
+    
+    with t1:
+        if not df.empty:
+            # ORDENAÇÃO ALFABÉTICA DA LISTA GERAL DE CLIENTES
+            if 'nome' in df.columns:
+                st.dataframe(df.sort_values('nome'), use_container_width=True)
+            else:
+                st.dataframe(df, use_container_width=True)
+        else: st.info("Nenhum cliente.")
+        
+    with t2:
+        if not df.empty:
+            # ORDENAÇÃO ALFABÉTICA NO MENU DE SELEÇÃO
+            lista_cli_edit = sorted(df['nome'].astype(str).tolist())
+            sel = st.selectbox("Cliente:", ["Selecione..."] + lista_cli_edit)
+            
+            if sel != "Selecione...":
+                idx = df[df['nome']==sel].index[0]
+                with st.form(f"cli_{idx}"):
+                    nn = st.text_input("Nome:", value=df.iloc[idx]['nome'])
+                    nt = st.text_input("Tel:", value=str(df.iloc[idx]['telefone']))
+                    np = st.number_input("Pontos:", value=int(df.iloc[idx]['compras']))
+                    if st.form_submit_button("💾 Salvar"):
+                        sheet_clientes.update_cell(idx+2, 1, nn)
+                        sheet_clientes.update_cell(idx+2, 2, nt)
+                        sheet_clientes.update_cell(idx+2, 3, np)
+                        st.success("Salvo!"); time.sleep(1); st.rerun()
 
 # ==========================================
 # 📊 HISTÓRICOS
