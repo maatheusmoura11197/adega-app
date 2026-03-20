@@ -45,11 +45,32 @@ if "carrinho" not in st.session_state: st.session_state.carrinho = []
 
 if not st.session_state.logado:
     st.markdown("<br><br><h1 style='text-align: center;'>🔒 Adega do Barão</h1>", unsafe_allow_html=True)
+
+    # JavaScript para submeter o form ao pressionar Enter no campo de senha
+    st.markdown("""
+        <script>
+        const waitField = setInterval(() => {
+            const inputs = window.parent.document.querySelectorAll('input[type=password]');
+            if (inputs.length > 0) {
+                inputs[0].addEventListener('keydown', function(e) {
+                    if (e.key === 'Enter') {
+                        const btns = window.parent.document.querySelectorAll('button[kind=primaryFormSubmit], button[data-testid=baseButton-secondaryFormSubmit], button');
+                        for (const btn of btns) {
+                            if (btn.innerText.includes('ACESSAR')) { btn.click(); break; }
+                        }
+                    }
+                });
+                clearInterval(waitField);
+            }
+        }, 300);
+        </script>
+    """, unsafe_allow_html=True)
+
     _, col_centro, _ = st.columns([1, 2, 1])
     with col_centro:
         with st.form("login_form"):
             senha = st.text_input("Senha de Acesso:", type="password", placeholder="Digite e aperte Enter ↵")
-            if st.form_submit_button("ACESSAR SISTEMA", use_container_width=True):
+            if st.form_submit_button("ACESSAR SISTEMA", use_container_width=True, type="primary"):
                 if senha == SENHA_DO_SISTEMA:
                     st.success("✅ Senha Correta!")
                     with st.spinner("Acessando Adega..."):
