@@ -70,12 +70,41 @@ try:
     client = gspread.authorize(creds)
     planilha = client.open("Fidelidade")
 
-    # Nomes padronizados em um único dicionário — evita NameError por inconsistência
+    # Mapeamento: chave interna → possíveis nomes na planilha (em ordem de preferência)
+    NOMES_ABAS = {
+        "clientes": ["Página1", "Pagina1", "página1", "pagina1", "Clientes", "clientes"],
+        "estoque":  ["Estoque", "estoque", "Stock"],
+        "hist_est": ["Historico_Estoque", "Histórico_Estoque", "Hist_Estoque", "hist_estoque", "Histórico Estoque"],
+        "hist_cli": ["Historico", "Histórico", "histórico", "historico", "Hist_Clientes"],
+    }
+
+    # Cabeçalhos padrão para criação automática de abas
+    HEADERS_ABAS = {
+        "clientes": ["nome", "telefone", "compras", "data_cadastro"],
+        "estoque":  ["Nome", "Tipo", "Fornecedor", "Custo", "Venda", "Estoque", "Data Compra", "Qtd_Fardo", "ML"],
+        "hist_est": ["Data", "Produto", "Tipo", "Qtd", "Valor"],
+        "hist_cli": ["Data", "Nome", "Telefone", "Pontos", "Valor_Pago"],
+    }
+
+    abas_existentes = {ws.title for ws in planilha.worksheets()}
+
+    def obter_ou_criar_aba(chave):
+        """Tenta encontrar a aba por vários nomes possíveis. Se não achar, cria com o nome padrão."""
+        for nome in NOMES_ABAS[chave]:
+            if nome in abas_existentes:
+                return planilha.worksheet(nome)
+        # Não encontrou — cria a aba com o nome padrão (primeiro da lista)
+        nome_novo = NOMES_ABAS[chave][0]
+        nova_aba  = planilha.add_worksheet(title=nome_novo, rows=1000, cols=20)
+        nova_aba.append_row(HEADERS_ABAS[chave])
+        st.toast(f"✅ Aba '{nome_novo}' criada automaticamente na planilha.", icon="📋")
+        return nova_aba
+
     sheets = {
-        "clientes":  planilha.worksheet("Página1"),
-        "estoque":   planilha.worksheet("Estoque"),
-        "hist_est":  planilha.worksheet("Histórico_Estoque"),
-        "hist_cli":  planilha.worksheet("Histórico"),
+        "clientes": obter_ou_criar_aba("clientes"),
+        "estoque":  obter_ou_criar_aba("estoque"),
+        "hist_est": obter_ou_criar_aba("hist_est"),
+        "hist_cli": obter_ou_criar_aba("hist_cli"),
     }
 
     def garantir_cabecalhos():
