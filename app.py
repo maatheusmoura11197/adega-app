@@ -6,6 +6,7 @@ import urllib.parse
 import re
 from datetime import datetime, date
 import time
+import io
 
 # ==========================================
 # ⚙️ CONFIGURAÇÃO E ESTILO
@@ -226,6 +227,14 @@ def montar_nome_exibicao(df):
         df['ML'].astype(str) + ")"
     )
     return df
+
+def exportar_excel(df, nome_arquivo):
+    # Gera arquivo Excel em memoria para download
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df.to_excel(writer, index=False, sheet_name='Dados')
+    output.seek(0)
+    return output
 
 def gerar_mensagem(nome_cliente, pontos):
     """Gera mensagem de WhatsApp de acordo com os pontos do cliente."""
@@ -508,23 +517,47 @@ elif menu == "💰 Caixa":
         df_est = carregar_dados_estoque()
         df_est = montar_nome_exibicao(df_est)
 
-        # Seleção de cliente
-        lista_clientes = (
-            ["🆕 NOVO"] + sorted((df_cli['nome'].astype(str) + " - " + df_cli['telefone'].astype(str)).tolist())
-            if not df_cli.empty else ["🆕 NOVO"]
-        )
-        sel_cliente = st.selectbox("Cliente:", lista_clientes)
-        c1, c2 = st.columns(2)
+        # Seleção de cliente — com busca por telefone
+        st.subheader("👤 Cliente")
+        modo_busca = st.radio("Como identificar o cliente?", ["📋 Selecionar da lista", "📱 Buscar por telefone"], horizontal=True, label_visibility="collapsed")
 
-        if sel_cliente == "🆕 NOVO":
-            nome_cliente     = c1.text_input("Nome:").upper()
-            telefone_cliente = c2.text_input("Tel:", placeholder="(85) 99999-9999")
+        nome_cliente     = ""
+        telefone_cliente = ""
+        sel_cliente      = "🆕 NOVO"
+
+        if modo_busca == "📱 Buscar por telefone":
+            tel_busca = st.text_input("Digite o telefone:", placeholder="(85) 99999-9999", key="tel_busca")
+            if tel_busca and not df_cli.empty:
+                tel_limpo_busca = limpar_tel(tel_busca)
+                resultado = df_cli[df_cli['telefone'].astype(str).apply(limpar_tel) == tel_limpo_busca]
+                if not resultado.empty:
+                    nome_cliente     = resultado.iloc[0]['nome']
+                    telefone_cliente = str(resultado.iloc[0]['telefone'])
+                    sel_cliente      = f"{nome_cliente} - {telefone_cliente}"
+                    st.success(f"✅ Cliente encontrado: **{nome_cliente}**")
+                elif len(tel_limpo_busca) >= 8:
+                    st.info("Cliente não cadastrado. Preencha o nome abaixo para cadastrar.")
+                    nome_cliente     = st.text_input("Nome do novo cliente:").upper()
+                    telefone_cliente = tel_busca
+            elif tel_busca:
+                nome_cliente     = st.text_input("Nome do novo cliente:").upper()
+                telefone_cliente = tel_busca
         else:
-            nome_cliente     = sel_cliente.split(" - ")[0]
-            telefone_cliente = sel_cliente.split(" - ")[1]
+            lista_clientes = (
+                ["🆕 NOVO"] + sorted((df_cli['nome'].astype(str) + " - " + df_cli['telefone'].astype(str)).tolist())
+                if not df_cli.empty else ["🆕 NOVO"]
+            )
+            sel_cliente = st.selectbox("Cliente:", lista_clientes)
+            c1, c2 = st.columns(2)
+            if sel_cliente == "🆕 NOVO":
+                nome_cliente     = c1.text_input("Nome:").upper()
+                telefone_cliente = c2.text_input("Tel:", placeholder="(85) 99999-9999")
+            else:
+                nome_cliente     = sel_cliente.split(" - ")[0]
+                telefone_cliente = sel_cliente.split(" - ")[1]
 
         # Mostra pontos atuais do cliente selecionado
-        if sel_cliente != "🆕 NOVO" and not df_cli.empty:
+        if sel_cliente != "🆕 NOVO" and not df_cli.empty and telefone_cliente:
             tel_limpo   = limpar_tel(telefone_cliente)
             match_atual = df_cli[df_cli['telefone'].astype(str).apply(limpar_tel) == tel_limpo]
             if not match_atual.empty:
@@ -573,8 +606,14 @@ elif menu == "💰 Caixa":
         if st.session_state.carrinho:
             st.write("---")
             st.subheader("🛒 Carrinho")
-            df_car = pd.DataFrame(st.session_state.carrinho)
-            st.table(df_car[['Produto', 'Qtd', 'Preço']])
+            for i, item in enumerate(st.session_state.carrinho):
+                col_prod, col_qtd, col_preco, col_rem = st.columns([4, 1, 2, 1])
+                col_prod.write(item['Produto'])
+                col_qtd.write(f"{item['Qtd']} un")
+                col_preco.write(para_real_visual(item['Qtd'] * item['Preço']))
+                if col_rem.button("❌", key=f"rem_{i}", help="Remover item"):
+                    st.session_state.carrinho.pop(i)
+                    st.rerun()
 
             total_bruto = sum(item['Qtd'] * item['Preço'] for item in st.session_state.carrinho)
 
@@ -747,6 +786,12 @@ elif menu == "📊 HISTÓRICOS":
                 ]
                 st.dataframe(df_filtrado, use_container_width=True)
                 st.caption(f"{len(df_filtrado)} registros no período selecionado.")
+                st.download_button(
+                    label="📥 Exportar Excel",
+                    data=exportar_excel(df_filtrado, "historico_clientes"),
+                    file_name=f"historico_clientes_{data_ini}_{data_fim}.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                )
             except Exception:
                 st.dataframe(df_hc.tail(200), use_container_width=True)
                 st.caption("Exibindo os 200 registros mais recentes.")
@@ -770,6 +815,12 @@ elif menu == "📊 HISTÓRICOS":
                 ]
                 st.dataframe(df_filtrado2, use_container_width=True)
                 st.caption(f"{len(df_filtrado2)} registros no período selecionado.")
+                st.download_button(
+                    label="📥 Exportar Excel",
+                    data=exportar_excel(df_filtrado2, "historico_estoque"),
+                    file_name=f"historico_estoque_{data_ini2}_{data_fim2}.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                )
             except Exception:
                 st.dataframe(df_he.tail(200), use_container_width=True)
                 st.caption("Exibindo os 200 registros mais recentes.")
