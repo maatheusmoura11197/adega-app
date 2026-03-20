@@ -46,39 +46,33 @@ if "carrinho" not in st.session_state: st.session_state.carrinho = []
 if not st.session_state.logado:
     st.markdown("<br><br><h1 style='text-align: center;'>🔒 Adega do Barão</h1>", unsafe_allow_html=True)
 
-    # JavaScript para submeter o form ao pressionar Enter no campo de senha
-    st.markdown("""
-        <script>
-        const waitField = setInterval(() => {
-            const inputs = window.parent.document.querySelectorAll('input[type=password]');
-            if (inputs.length > 0) {
-                inputs[0].addEventListener('keydown', function(e) {
-                    if (e.key === 'Enter') {
-                        const btns = window.parent.document.querySelectorAll('button[kind=primaryFormSubmit], button[data-testid=baseButton-secondaryFormSubmit], button');
-                        for (const btn of btns) {
-                            if (btn.innerText.includes('ACESSAR')) { btn.click(); break; }
-                        }
-                    }
-                });
-                clearInterval(waitField);
-            }
-        }, 300);
-        </script>
-    """, unsafe_allow_html=True)
+    def tentar_login():
+        senha_digitada = st.session_state.get("campo_senha", "")
+        if senha_digitada == SENHA_DO_SISTEMA:
+            st.session_state.logado = True
+            st.session_state.login_erro = False
+        else:
+            st.session_state.login_erro = True
+
+    if "login_erro" not in st.session_state:
+        st.session_state.login_erro = False
 
     _, col_centro, _ = st.columns([1, 2, 1])
     with col_centro:
-        with st.form("login_form"):
-            senha = st.text_input("Senha de Acesso:", type="password", placeholder="Digite e aperte Enter ↵")
-            if st.form_submit_button("ACESSAR SISTEMA", use_container_width=True, type="primary"):
-                if senha == SENHA_DO_SISTEMA:
-                    st.success("✅ Senha Correta!")
-                    with st.spinner("Acessando Adega..."):
-                        time.sleep(1)
-                        st.session_state.logado = True
-                        st.rerun()
-                else:
-                    st.error("🚫 Senha incorreta!")
+        st.text_input(
+            "Senha de Acesso:",
+            type="password",
+            placeholder="Digite e aperte Enter ↵",
+            key="campo_senha",
+            on_change=tentar_login
+        )
+        st.button("ACESSAR SISTEMA", on_click=tentar_login, use_container_width=True, type="primary")
+        if st.session_state.login_erro:
+            st.error("🚫 Senha incorreta!")
+
+    if st.session_state.logado:
+        st.rerun()
+
     st.stop()
 
 # ==========================================
