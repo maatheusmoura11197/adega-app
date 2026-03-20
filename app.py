@@ -49,7 +49,7 @@ if not st.session_state.logado:
     with col_centro:
         with st.form("login_form"):
             senha = st.text_input("Senha de Acesso:", type="password", placeholder="Digite e aperte Enter ↵")
-            if st.form_submit_button("ACESSAR SISTEMA"):
+            if st.form_submit_button("ACESSAR SISTEMA", use_container_width=True):
                 if senha == SENHA_DO_SISTEMA:
                     st.success("✅ Senha Correta!")
                     with st.spinner("Acessando Adega..."):
@@ -214,24 +214,54 @@ def montar_nome_exibicao(df):
 
 def gerar_mensagem(nome_cliente, pontos):
     """Gera mensagem de WhatsApp de acordo com os pontos do cliente."""
-    nome = nome_cliente.split()[0].capitalize()
+    import random
+    nome   = nome_cliente.split()[0].capitalize()
+    faltam = PONTOS_PREMIO - pontos
+
+    # --- 1º ponto: boas-vindas ---
     if pontos == 1:
         return (
-            f"Oi, {nome}! ✨\nObrigado por comprar na Adega do Barão! "
-            f"Já abriu seu Cartão Fidelidade. A cada {PONTOS_PREMIO} compras você ganha um prêmio! "
-            f"Você garantiu o seu 1º ponto. Ah e não esquece de avaliar a gente no *JA PEDIU* 🍷",
+            f"Oi, {nome}! 🍺 Seja bem-vindo à família Adega do Barão!\n"
+            f"Seu cartão fidelidade está aberto e o primeiro ponto já foi carimbado. "
+            f"A cada {PONTOS_PREMIO} compras você ganha um prêmio especial.\n"
+            f"Fico feliz em ter você aqui! Se puder nos avaliar no *JA PEDIU*, a gente agradece muito 🙏",
             "Enviar Boas-Vindas 🎉"
         )
-    elif 1 < pontos < PONTOS_PREMIO:
+
+    # --- Quase lá: 8 ou 9 pontos ---
+    elif pontos >= PONTOS_PREMIO - 2 and pontos < PONTOS_PREMIO:
         return (
-            f"E aí, {nome}! 👊\nCompra registrada! Agora você tem *{pontos} pontos*. ✨\n"
-            f"Faltam só {PONTOS_PREMIO - pontos} para o prêmio! Tamo junto! 🍻",
+            f"Ei, {nome}! 👀 *{pontos} pontos*... falta só {faltam} pro prêmio.\n"
+            f"Dá quase pra sentir o cheirinho da recompensa, né? 😏🍻 Até a próxima!\n"
+            f"E se ainda não nos avaliou no *JA PEDIU*, aproveita — leva só um segundo ⭐",
             f"Enviar Saldo ({pontos}/{PONTOS_PREMIO}) 📲"
         )
+
+    # --- Meio do caminho: 2–7 pontos ---
+    elif 1 < pontos < PONTOS_PREMIO:
+        frases_incentivo = [
+            "Cada compra tá te deixando mais perto do prêmio!",
+            "Você tá indo muito bem, continua assim! 💪",
+            "A Adega do Barão tá torcendo por você!",
+            "Tamo junto nessa jornada rumo ao prêmio! 🙌",
+        ]
+        incentivo = random.choice(frases_incentivo)
+        return (
+            f"Obrigado pela visita, {nome}! 🙏\n"
+            f"Mais um ponto no seu cartão — agora você tem *{pontos} de {PONTOS_PREMIO}*.\n"
+            f"{incentivo} A Adega do Barão tá sempre te esperando! 🍺\n"
+            f"Ah, se ainda não nos avaliou no *JA PEDIU*, aproveita e deixa suas estrelinhas pra gente ⭐",
+            f"Enviar Saldo ({pontos}/{PONTOS_PREMIO}) 📲"
+        )
+
+    # --- Prêmio conquistado: 10 pontos ---
     else:
         return (
-            f"PARABÉNS, {nome}!!! ✨🏆\nVocê completou {PONTOS_PREMIO} pontos e ganhou um "
-            f"*DESCONTO DE 20%* hoje! Aproveite! 🥳🍷",
+            f"PARABÉNS, {nome}!!! 🎉🏆\n"
+            f"Você completou {PONTOS_PREMIO} pontos e conquistou seu prêmio!\n"
+            f"Hoje você tem *20% de desconto* na Adega do Barão.\n"
+            f"Pode chegar que a gente tá te esperando! 🥳🍷\n"
+            f"E se curtiu a experiência, deixa sua avaliação no *JA PEDIU* pra gente 🙏⭐",
             "🏆 ENVIAR PRÊMIO!"
         )
 
