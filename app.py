@@ -80,11 +80,15 @@ if not st.session_state.logado:
 # 📡 CONEXÃO COM GOOGLE SHEETS
 # ==========================================
 
-try:
-    scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+@st.cache_resource
+def conectar_sheets():
+    scope  = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
     creds  = ServiceAccountCredentials.from_json_keyfile_dict(st.secrets["gcp_service_account"], scope)
     client = gspread.authorize(creds)
-    planilha = client.open("Fidelidade")
+    return client.open("Fidelidade")
+
+try:
+    planilha = conectar_sheets()
 
     # Mapeamento: chave interna → possíveis nomes na planilha (em ordem de preferência)
     NOMES_ABAS = {
@@ -133,7 +137,7 @@ try:
         except Exception as e:
             st.warning(f"Não foi possível verificar os cabeçalhos da planilha: {e}")
 
-    @st.cache_data(ttl=10)
+    @st.cache_data(ttl=60)
     def carregar_dados_estoque():
         try:
             return pd.DataFrame(sheets["estoque"].get_all_records())
@@ -141,7 +145,7 @@ try:
             st.warning(f"Erro ao carregar estoque: {e}")
             return pd.DataFrame()
 
-    @st.cache_data(ttl=10)
+    @st.cache_data(ttl=60)
     def carregar_dados_clientes():
         try:
             return pd.DataFrame(sheets["clientes"].get_all_records())
@@ -149,7 +153,7 @@ try:
             st.warning(f"Erro ao carregar clientes: {e}")
             return pd.DataFrame()
 
-    @st.cache_data(ttl=10)
+    @st.cache_data(ttl=60)
     def carregar_historico_cli():
         try:
             return pd.DataFrame(sheets["hist_cli"].get_all_records())
@@ -157,7 +161,7 @@ try:
             st.warning(f"Erro ao carregar histórico de clientes: {e}")
             return pd.DataFrame()
 
-    @st.cache_data(ttl=10)
+    @st.cache_data(ttl=60)
     def carregar_historico_est():
         try:
             return pd.DataFrame(sheets["hist_est"].get_all_records())
@@ -170,6 +174,10 @@ try:
         carregar_dados_clientes.clear()
         carregar_historico_cli.clear()
         carregar_historico_est.clear()
+        # Limpa o mini-cache de linhas do session_state
+        chaves = [k for k in st.session_state if k.startswith("_linha_")]
+        for k in chaves:
+            del st.session_state[k]
 
     garantir_cabecalhos()
 
@@ -290,14 +298,17 @@ def gerar_mensagem(nome_cliente, pontos):
         )
 
 def buscar_linha_real(sheet, nome_busca, coluna_nome=1):
-    """
-    Busca a linha real na planilha pelo nome do produto (não pelo índice do DataFrame).
-    Evita o bug de índice dessincronizado quando o cache está desatualizado.
-    Retorna o número da linha (1-based) ou None se não encontrar.
-    """
+    # Usa mini-cache em session_state para evitar chamadas repetidas ao Sheets
+    # O cache é limpo automaticamente quando limpar_cache() é chamado
+    cache_key = f"_linha_{sheet.title}_{nome_busca}"
+    if cache_key in st.session_state:
+        return st.session_state[cache_key]
     try:
         cell = sheet.find(nome_busca, in_column=coluna_nome)
-        return cell.row if cell else None
+        row  = cell.row if cell else None
+        if row:
+            st.session_state[cache_key] = row
+        return row
     except Exception:
         return None
 
@@ -467,9 +478,7 @@ if menu == "📦 Estoque":
                                     {"range": f"I{linha_real}", "values": [[ml_final]]},
                                 ])
                                 limpar_cache()
-                                st.success("✅ Produto atualizado!")
-                                time.sleep(1)
-                                st.rerun()
+                                st.success("✅ Produto atualizado! Navegue para outra aba para ver as mudanças.")
 
                     # Exclusão com confirmação em 2 cliques
                     if b_exc.form_submit_button("🗑️ EXCLUIR", type="primary"):
@@ -753,7 +762,6 @@ elif menu == "👥 Clientes":
                                 ])
                                 limpar_cache()
                                 st.success("✅ Cliente atualizado!")
-                                st.rerun()
                             else:
                                 st.error("Cliente não encontrado na planilha.")
         else:
